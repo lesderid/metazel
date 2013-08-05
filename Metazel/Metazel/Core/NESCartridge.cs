@@ -62,6 +62,9 @@ namespace Metazel
 			VRAMLayout = fourScreenVRAM ? VRAMLayout.FourScreenLayout : (mirroring ? VRAMLayout.HorizontalLayout : VRAMLayout.VerticalLayout);
 
 			Region = isPAL ? Region.PAL : Region.NTSC;
+
+			reader.BaseStream.Dispose();
+			reader.Dispose();
 		}
 
 		public void SaveRAM()

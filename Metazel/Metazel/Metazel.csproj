@@ -25,6 +25,7 @@
     <DefineConstants>DEBUG;TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
+    <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <PlatformTarget>AnyCPU</PlatformTarget>
@@ -45,18 +46,18 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Extensions.cs" />
-    <Compile Include="MemoryMap.cs" />
-    <Compile Include="NESCartridge.cs" />
-    <Compile Include="NESEngine.cs" />
+    <Compile Include="Memory\MemoryMirror.cs" />
+    <Compile Include="Memory\IndexedByteArray.cs" />
+    <Compile Include="Misc\Extensions.cs" />
+    <Compile Include="Memory\IMemoryProvider.cs" />
+    <Compile Include="Memory\MemoryMap.cs" />
+    <Compile Include="Core\NESCartridge.cs" />
+    <Compile Include="Core\NESEngine.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="Region.cs" />
-    <Compile Include="ROMMapper.cs" />
-    <Compile Include="VRAMLayout.cs" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="App.config" />
+    <Compile Include="Misc\Region.cs" />
+    <Compile Include="Misc\ROMMapper.cs" />
+    <Compile Include="Misc\VRAMLayout.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 

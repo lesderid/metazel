@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
 
 namespace Metazel
@@ -8,6 +7,38 @@ namespace Metazel
 	internal class MemoryMap
 	{
 		private readonly List<MemoryMapEntry> _map = new List<MemoryMapEntry>();
+
+		public byte? this[int address]
+		{
+			get
+			{
+				var entryAddressTuple = Find(address);
+				var memoryProvider = entryAddressTuple.Item1.MemoryProvider;
+				var relativeAddress = entryAddressTuple.Item2;
+
+				var byteArray = memoryProvider as byte[];
+				if (byteArray != null)
+					return byteArray[relativeAddress];
+
+				var provider = memoryProvider as IMemoryProvider;
+				return provider != null ? provider[relativeAddress] : null;
+			}
+
+			set
+			{
+				var entryAddressTuple = Find(address);
+				var memoryProvider = entryAddressTuple.Item1.MemoryProvider;
+				var relativeAddress = entryAddressTuple.Item2;
+
+				if (value == null)
+					throw new ArgumentNullException("address");
+
+				if (memoryProvider is byte[])
+					((byte[]) memoryProvider)[relativeAddress] = (byte) value;
+				else if (memoryProvider is IMemoryProvider)
+					((IMemoryProvider) memoryProvider)[address] = value;
+			}
+		}
 
 		public short? GetShort(int address)
 		{
@@ -26,37 +57,6 @@ namespace Metazel
 
 			this[address] = bytes[0];
 			this[address + 1] = bytes[1];
-		}
-
-		public byte? this[int address]
-		{
-			get
-			{
-				var entryAddressTuple = Find(address);
-				var memoryProvider = entryAddressTuple.Item1.MemoryProvider;
-				var relativeAddress = entryAddressTuple.Item2;
-
-				if (memoryProvider is byte[])
-					return ((byte[]) memoryProvider)[relativeAddress];
-				else
-					throw new NotImplementedException();
-			}
-
-			set
-			{
-				var entryAddressTuple = Find(address);
-				var memoryProvider = entryAddressTuple.Item1.MemoryProvider;
-				var relativeAddress = entryAddressTuple.Item2;
-
-				if (memoryProvider is byte[])
-				{
-					Debug.Assert(value != null, "value != null");
-
-					((byte[]) memoryProvider)[relativeAddress] = (byte) value;
-				}
-				else
-					throw new NotImplementedException();
-			}
 		}
 
 		private Tuple<MemoryMapEntry, int> Find(int address)
