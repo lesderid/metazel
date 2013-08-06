@@ -4,7 +4,7 @@ using System.Linq;
 
 namespace Metazel
 {
-	internal class MemoryMap
+	public class MemoryMap
 	{
 		private readonly List<MemoryMapEntry> _map = new List<MemoryMapEntry>();
 
@@ -16,12 +16,16 @@ namespace Metazel
 				var memoryProvider = entryAddressTuple.Item1.MemoryProvider;
 				var relativeAddress = entryAddressTuple.Item2;
 
-				var byteArray = memoryProvider as byte[];
-				if (byteArray != null)
-					return byteArray[relativeAddress];
+                if (memoryProvider is byte[])
+                    return ((byte[])memoryProvider)[relativeAddress];
+                else if (memoryProvider is IMemoryProvider)
+                    return ((IMemoryProvider)memoryProvider)[relativeAddress];
+                else
+                {
+                    Console.WriteLine("Reading from {1:X4}.", address); //TODO: Throw exception/don't allow other types of providers in Add().
 
-				var provider = memoryProvider as IMemoryProvider;
-				return provider != null ? provider[relativeAddress] : null;
+                    return null;
+                }
 			}
 
 			set
@@ -37,6 +41,8 @@ namespace Metazel
 					((byte[]) memoryProvider)[relativeAddress] = (byte) value;
 				else if (memoryProvider is IMemoryProvider)
 					((IMemoryProvider) memoryProvider)[address] = value;
+                else
+                    Console.WriteLine("Writing {0:X2} to {1:X4}.", value, address); //TODO: Throw exception/don't allow other types of providers in Add().
 			}
 		}
 

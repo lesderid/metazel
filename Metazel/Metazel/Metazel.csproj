@@ -46,6 +46,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Core\NESCPU.cs" />
     <Compile Include="Memory\MemoryMirror.cs" />
     <Compile Include="Memory\IndexedByteArray.cs" />
     <Compile Include="Misc\Extensions.cs" />

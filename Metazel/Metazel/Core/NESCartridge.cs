@@ -7,6 +7,9 @@ namespace Metazel
 	{
 		public NESCartridge(string path)
 		{
+            if (!File.Exists(path))
+                throw new FileNotFoundException();
+
 			var data = File.ReadAllBytes(path);
 			var reader = new BinaryReader(new MemoryStream(data));
 
