@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -108,7 +109,12 @@ namespace Metazel
 
 		public void Run()
 		{
+			var path = Cartridge.Name + ".log";
+			if(File.Exists(path))
+				File.Delete(path);
+
             _cpu = new NESCPU(this);
+			_cpu.Run(); //TODO: Synchronize with future PPU. (1 CPU tick <=> 3 PPU dots)
 		}
 	}
 }

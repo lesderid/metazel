@@ -8,7 +8,7 @@ namespace Metazel
 	{
 		private readonly List<MemoryMapEntry> _map = new List<MemoryMapEntry>();
 
-		public byte? this[int address]
+		public byte this[int address]
 		{
 			get
 			{
@@ -16,16 +16,16 @@ namespace Metazel
 				var memoryProvider = entryAddressTuple.Item1.MemoryProvider;
 				var relativeAddress = entryAddressTuple.Item2;
 
-                if (memoryProvider is byte[])
-                    return ((byte[])memoryProvider)[relativeAddress];
-                else if (memoryProvider is IMemoryProvider)
-                    return ((IMemoryProvider)memoryProvider)[relativeAddress];
-                else
-                {
-                    Console.WriteLine("Reading from {1:X4}.", address); //TODO: Throw exception/don't allow other types of providers in Add().
+				if (memoryProvider is byte[])
+					return ((byte[]) memoryProvider)[relativeAddress];
+				else if (memoryProvider is IMemoryProvider)
+					return ((IMemoryProvider) memoryProvider)[relativeAddress];
+				else
+				{
+					Console.WriteLine("Reading from {0:X4}.", address); //TODO: Throw exception/don't allow other types of providers in Add().
 
-                    return null;
-                }
+					return 0;
+				}
 			}
 
 			set
@@ -34,27 +34,18 @@ namespace Metazel
 				var memoryProvider = entryAddressTuple.Item1.MemoryProvider;
 				var relativeAddress = entryAddressTuple.Item2;
 
-				if (value == null)
-					throw new ArgumentNullException("address");
-
 				if (memoryProvider is byte[])
-					((byte[]) memoryProvider)[relativeAddress] = (byte) value;
+					((byte[]) memoryProvider)[relativeAddress] = value;
 				else if (memoryProvider is IMemoryProvider)
 					((IMemoryProvider) memoryProvider)[address] = value;
-                else
-                    Console.WriteLine("Writing {0:X2} to {1:X4}.", value, address); //TODO: Throw exception/don't allow other types of providers in Add().
+				else
+					Console.WriteLine("Writing {0:X2} to {1:X4}.", value, address); //TODO: Throw exception/don't allow other types of providers in Add().
 			}
 		}
 
-		public short? GetShort(int address)
+		public short GetShort(int address)
 		{
-			var firstByte = this[address];
-			var secondByte = this[address + 1];
-
-			if (firstByte == null || secondByte == null)
-				return null;
-
-			return BitConverter.ToInt16(new[] { (byte) firstByte, (byte) secondByte }, 0);
+			return BitConverter.ToInt16(new[] { this[address], this[address + 1] }, 0);
 		}
 
 		public void SetShort(int address, short value)

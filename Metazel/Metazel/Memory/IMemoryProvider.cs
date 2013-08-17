@@ -2,6 +2,6 @@
 {
 	internal interface IMemoryProvider
 	{
-		byte? this[int address] { get; set; }
+		byte this[int address] { get; set; }
 	}
 }

@@ -17,7 +17,7 @@ namespace Metazel
 
 		#region IMemoryProvider Members
 
-		public byte? this[int address]
+		public byte this[int address]
 		{
 			get
 			{

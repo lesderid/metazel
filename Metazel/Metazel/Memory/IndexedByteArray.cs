@@ -15,16 +15,10 @@ namespace Metazel
 
 		#region IMemoryProvider Members
 
-		public byte? this[int address]
+		public byte this[int address]
 		{
 			get { return _underlyingArray[_baseAddress + address]; }
-			set
-			{
-				if (value != null)
-					_underlyingArray[_baseAddress + address] = (byte) value;
-				else
-					throw new ArgumentNullException("address");
-			}
+			set { _underlyingArray[_baseAddress + address] = value; }
 		}
 
 		#endregion

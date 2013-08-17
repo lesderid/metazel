@@ -26,6 +26,7 @@
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
     <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
+    <Prefer32Bit>true</Prefer32Bit>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <PlatformTarget>AnyCPU</PlatformTarget>
@@ -35,6 +36,9 @@
     <DefineConstants>TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <PropertyGroup>
+    <StartupObject>Metazel.Program</StartupObject>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="System" />
@@ -46,7 +50,10 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Core\NESCPU.cs" />
+    <Compile Include="Core\CPU\AddressingMode.cs" />
+    <Compile Include="Core\CPU\Instruction.cs" />
+    <Compile Include="Core\CPU\InstructionMetadata.cs" />
+    <Compile Include="Core\CPU\NESCPU.cs" />
     <Compile Include="Memory\MemoryMirror.cs" />
     <Compile Include="Memory\IndexedByteArray.cs" />
     <Compile Include="Misc\Extensions.cs" />
