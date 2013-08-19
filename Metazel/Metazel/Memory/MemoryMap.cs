@@ -8,6 +8,9 @@ namespace Metazel
 	{
 		private readonly List<MemoryMapEntry> _map = new List<MemoryMapEntry>();
 
+		private Tuple<MemoryMapEntry, int>[] _entryAddressTuples;
+		private bool _entryAddressTuplesDirty = true;
+
 		public byte this[int address]
 		{
 			get
@@ -22,7 +25,7 @@ namespace Metazel
 					return ((IMemoryProvider) memoryProvider)[relativeAddress];
 				else
 				{
-					Console.WriteLine("Reading from {0:X4}.", address); //TODO: Throw exception/don't allow other types of providers in Add().
+					//Console.WriteLine("Reading from {0:X4}.", address); //TODO: Throw exception/don't allow other types of providers in Add().
 
 					return 0;
 				}
@@ -38,8 +41,8 @@ namespace Metazel
 					((byte[]) memoryProvider)[relativeAddress] = value;
 				else if (memoryProvider is IMemoryProvider)
 					((IMemoryProvider) memoryProvider)[address] = value;
-				else
-					Console.WriteLine("Writing {0:X2} to {1:X4}.", value, address); //TODO: Throw exception/don't allow other types of providers in Add().
+				//else
+				//	Console.WriteLine("Writing {0:X2} to {1:X4}.", value, address); //TODO: Throw exception/don't allow other types of providers in Add().
 			}
 		}
 
@@ -58,6 +61,9 @@ namespace Metazel
 
 		private Tuple<MemoryMapEntry, int> Find(int address)
 		{
+			if (!_entryAddressTuplesDirty)
+				return _entryAddressTuples[address];
+
 			MemoryMapEntry smaller = null;
 
 			foreach (var entry in _map)
@@ -72,6 +78,18 @@ namespace Metazel
 				smaller = null;
 
 			return smaller == null ? null : new Tuple<MemoryMapEntry, int>(smaller, address - smaller.Start);
+		}
+
+		public void PopulateTuplesList()
+		{
+			_entryAddressTuples = new Tuple<MemoryMapEntry, int>[ushort.MaxValue];
+
+			for (var i = 0; i < _entryAddressTuples.Length; i++)
+			{
+				_entryAddressTuples[i] = Find(i);
+			}
+
+			_entryAddressTuplesDirty = false;
 		}
 
 		public bool Add(int start, int length, object memory)
@@ -102,6 +120,8 @@ namespace Metazel
 				return false;
 
 			_map.Add(new MemoryMapEntry(start, length, memory));
+
+			_entryAddressTuplesDirty = true;
 
 			return true;
 		}

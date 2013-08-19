@@ -25,7 +25,8 @@ namespace Metazel
 
 		private byte[] _ppuPaletteData = new byte[0x20];
 
-        private NESCPU _cpu;
+		private NESCPU _cpu;
+		private NESPPU _ppu;
 
 		public void Load(NESCartridge cartridge)
 		{
@@ -37,7 +38,7 @@ namespace Metazel
 			PPUMemoryMap.Clear();
 
 			_cpuRAM = new byte[_cpuRAM.Length];
-			
+
 			_nametableA = new byte[_nametableA.Length];
 			_nametableB = new byte[_nametableB.Length];
 
@@ -49,8 +50,11 @@ namespace Metazel
 
 		private void InitialisePPUMemoryMap()
 		{
-			PPUMemoryMap.Add(0, 0x1000, Cartridge.VROMBanks[0]);
-			PPUMemoryMap.Add(0x1000, 0x1000, new IndexedByteArray(Cartridge.VROMBanks[0], 0x1000));
+			if (Cartridge.VROMBanks.Length > 0)
+			{
+				PPUMemoryMap.Add(0, 0x1000, Cartridge.VROMBanks[0]);
+				PPUMemoryMap.Add(0x1000, 0x1000, new IndexedByteArray(Cartridge.VROMBanks[0], 0x1000));
+			}
 
 			switch (Cartridge.VRAMLayout)
 			{
@@ -59,7 +63,7 @@ namespace Metazel
 					PPUMemoryMap.Add(0x2400, _nametableA.Length, _nametableA);
 					PPUMemoryMap.Add(0x2800, _nametableB.Length, _nametableB);
 					PPUMemoryMap.Add(0x2C00, _nametableB.Length, _nametableB);
-		
+
 					PPUMemoryMap.Add(0x3000, _nametableA.Length, _nametableA);
 					PPUMemoryMap.Add(0x3400, _nametableA.Length, _nametableA);
 					PPUMemoryMap.Add(0x3800, _nametableB.Length, _nametableB);
@@ -105,16 +109,53 @@ namespace Metazel
 
 			CPUMemoryMap.Add(0x8000, 0x4000, Cartridge.ROMBanks[0]);
 			CPUMemoryMap.Add(0xC000, 0x4000, Cartridge.ROMBanks.Length == 1 ? Cartridge.ROMBanks[0] : Cartridge.ROMBanks[1]);
+
+			CPUMemoryMap.PopulateTuplesList();
 		}
 
 		public void Run()
 		{
 			var path = Cartridge.Name + ".log";
-			if(File.Exists(path))
+			if (File.Exists(path))
 				File.Delete(path);
 
-            _cpu = new NESCPU(this);
-			_cpu.Run(); //TODO: Synchronize with future PPU. (1 CPU tick <=> 3 PPU dots)
+			_cpu = new NESCPU(this);
+			_ppu = new NESPPU(this);
+
+			var i = 1;
+
+			var previousTicks = Environment.TickCount;
+
+			while (true)
+			{
+				switch (i)
+				{
+					case 1:
+						_ppu.DoCycle();
+
+						i = 2;
+						break;
+					case 2:
+						_cpu.DoCycle();
+
+						if (_cpu.TotalCycleCount % 1789772 == 0)
+						{
+							Console.WriteLine(Environment.TickCount - previousTicks);
+
+							previousTicks = Environment.TickCount;
+						}
+
+						_ppu.DoCycle();
+
+						i = 3;
+						break;
+					case 3:
+						_ppu.DoCycle();
+
+						i = 1;
+						break;
+				}
+			}
 		}
 	}
 }
