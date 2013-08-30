@@ -19,7 +19,7 @@ namespace Metazel
 		[Pure]
 		public static byte GetBits(this byte input, int start, int end)
 		{
-			return (byte) (input << 7 - end >> 7 - end + start);
+			return (byte) ((byte) (input << 7 - end) >> 7 - end + start);
 		}
 	}
 }

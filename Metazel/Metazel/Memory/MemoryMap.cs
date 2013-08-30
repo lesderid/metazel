@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 
 namespace Metazel
@@ -40,7 +41,7 @@ namespace Metazel
 				if (memoryProvider is byte[])
 					((byte[]) memoryProvider)[relativeAddress] = value;
 				else if (memoryProvider is IMemoryProvider)
-					((IMemoryProvider) memoryProvider)[address] = value;
+					((IMemoryProvider) memoryProvider)[relativeAddress] = value;
 				//else
 				//	Console.WriteLine("Writing {0:X2} to {1:X4}.", value, address); //TODO: Throw exception/don't allow other types of providers in Add().
 			}
@@ -82,7 +83,7 @@ namespace Metazel
 
 		public void PopulateTuplesList()
 		{
-			_entryAddressTuples = new Tuple<MemoryMapEntry, int>[ushort.MaxValue];
+			_entryAddressTuples = new Tuple<MemoryMapEntry, int>[ushort.MaxValue + 1];
 
 			for (var i = 0; i < _entryAddressTuples.Length; i++)
 			{

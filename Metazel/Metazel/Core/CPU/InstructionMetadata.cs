@@ -3,7 +3,7 @@ using System.Collections.Generic;
 
 namespace Metazel
 {
-	partial class NESCPU
+	public partial class NESCPU
 	{
 		// ReSharper disable InconsistentNaming -> Ignore opcode names.
 
@@ -85,14 +85,14 @@ namespace Metazel
 				{ 0xDC, new InstructionMetadata("NOP", AddressingMode.AbsoluteX, 2, 4, NOP) },
 				{ 0xFC, new InstructionMetadata("NOP", AddressingMode.AbsoluteX, 2, 4, NOP) },
 
-				{ 0xB0, new InstructionMetadata("BCS", AddressingMode.Relative, 1, 2, (data, bytes) => BC(bytes, true)) },
-				{ 0x90, new InstructionMetadata("BCC", AddressingMode.Relative, 1, 2, (data, bytes) => BC(bytes, false)) },
-				{ 0xF0, new InstructionMetadata("BEQ", AddressingMode.Relative, 1, 2, (data, bytes) => BZ(bytes, true)) },
-				{ 0xD0, new InstructionMetadata("BNE", AddressingMode.Relative, 1, 2, (data, bytes) => BZ(bytes, false)) },
-				{ 0x70, new InstructionMetadata("BVS", AddressingMode.Relative, 1, 2, (data, bytes) => BV(bytes, true)) },
-				{ 0x50, new InstructionMetadata("BVC", AddressingMode.Relative, 1, 2, (data, bytes) => BV(bytes, false)) },
-				{ 0x10, new InstructionMetadata("BPL", AddressingMode.Relative, 1, 2, (data, bytes) => BN(bytes, false)) },
-				{ 0x30, new InstructionMetadata("BMI", AddressingMode.Relative, 1, 2, (data, bytes) => BN(bytes, true)) },
+				{ 0xB0, new InstructionMetadata("BCS", AddressingMode.Relative, 1, 2, (data, bytes) => B(bytes, C, true)) },
+				{ 0x90, new InstructionMetadata("BCC", AddressingMode.Relative, 1, 2, (data, bytes) => B(bytes, C, false)) },
+				{ 0xF0, new InstructionMetadata("BEQ", AddressingMode.Relative, 1, 2, (data, bytes) => B(bytes, Z, true)) },
+				{ 0xD0, new InstructionMetadata("BNE", AddressingMode.Relative, 1, 2, (data, bytes) => B(bytes, Z, false)) },
+				{ 0x70, new InstructionMetadata("BVS", AddressingMode.Relative, 1, 2, (data, bytes) => B(bytes, V, true)) },
+				{ 0x50, new InstructionMetadata("BVC", AddressingMode.Relative, 1, 2, (data, bytes) => B(bytes, V, false)) },
+				{ 0x10, new InstructionMetadata("BPL", AddressingMode.Relative, 1, 2, (data, bytes) => B(bytes, N, false)) },
+				{ 0x30, new InstructionMetadata("BMI", AddressingMode.Relative, 1, 2, (data, bytes) => B(bytes, N, true)) },
 
 				{ 0x24, new InstructionMetadata("BIT", AddressingMode.ZeroPage, 1, 3, BIT) },
 				{ 0x2C, new InstructionMetadata("BIT", AddressingMode.Absolute, 2, 4, BIT) },
@@ -1429,46 +1429,6 @@ namespace Metazel
 			PC = (ushort) (PopUInt16() + 1);
 		}
 
-		private void BN(IList<byte> operands, bool state)
-		{
-			if (N == state)
-			{
-				var bytes = BitConverter.GetBytes(PC);
-				bytes[0] += operands[0];
-
-				if (bytes[0] == 0 && operands[0] != 0)
-				{
-					bytes[1]++;
-
-					_currentInstruction.CyclesLeft++;
-				}
- 
-				PC = BitConverter.ToUInt16(bytes, 0);
-
-				_currentInstruction.CyclesLeft++;
-			}
-		}
-
-		private void BV(IList<byte> operands, bool state)
-		{
-			if (V == state)
-			{
-				var bytes = BitConverter.GetBytes(PC);
-				bytes[0] += operands[0];
-
-				if (bytes[0] == 0 && operands[0] != 0)
-				{
-					bytes[1]++;
-
-					_currentInstruction.CyclesLeft++;
-				}
- 
-				PC = BitConverter.ToUInt16(bytes, 0);
-
-				_currentInstruction.CyclesLeft++;
-			}
-		}
-
 		private void BIT(InstructionMetadata metadata, byte[] operands)
 		{
 			byte value = 0;
@@ -1488,41 +1448,16 @@ namespace Metazel
 			N = value.GetBit(7);
 		}
 
-		private void BZ(IList<byte> operands, bool state)
+		private void B(IList<byte> operands, bool flag, bool state)
 		{
-			if (Z == state)
+			if (flag == state)
 			{
-				var bytes = BitConverter.GetBytes(PC);
-				bytes[0] += operands[0];
+				var target = (ushort) (PC + (sbyte) operands[0]);
 
-				if (bytes[0] == 0 && operands[0] != 0)
-				{
-					bytes[1]++;
-
+				if (PC >> 8 << 8 != target >> 8 << 8)
 					_currentInstruction.CyclesLeft++;
-				}
- 
-				PC = BitConverter.ToUInt16(bytes, 0);
 
-				_currentInstruction.CyclesLeft++;
-			}
-		}
-
-		private void BC(IList<byte> operands, bool state)
-		{
-			if (C == state)
-			{
-				var bytes = BitConverter.GetBytes(PC);
-				bytes[0] += operands[0];
-
-				if (bytes[0] == 0 && operands[0] != 0)
-				{
-					bytes[1]++;
-
-					_currentInstruction.CyclesLeft++;
-				}
- 
-				PC = BitConverter.ToUInt16(bytes, 0);
+				PC = target;
 
 				_currentInstruction.CyclesLeft++;
 			}
@@ -1546,7 +1481,7 @@ namespace Metazel
 		{
 			Push((ushort) (PC - 1));
 
-			PC = BitConverter.ToUInt16(operands, 0);
+			PC = BitConverter.ToUInt16(operands, 0); 
 		}
 
 		private void STA(InstructionMetadata metadata, byte[] operands)

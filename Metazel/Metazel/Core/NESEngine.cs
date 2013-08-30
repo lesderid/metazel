@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Drawing;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -16,23 +17,25 @@ namespace Metazel
 		private byte[] _cpuRAM = new byte[0x800];
 
 		private object _cpuRegisters;
-		private object _ppuRegisters;
 
 		public NESCartridge Cartridge { get; private set; }
 
 		private byte[] _nametableA = new byte[0x400];
 		private byte[] _nametableB = new byte[0x400];
 
-		private byte[] _ppuPaletteData = new byte[0x20];
-
-		private NESCPU _cpu;
-		private NESPPU _ppu;
+		public NESCPU CPU;
+		public NESPPU PPU;
 
 		public void Load(NESCartridge cartridge)
 		{
 			//TODO: Change memory map based on mapper type.
 
 			Cartridge = cartridge;
+
+			Debug.Assert(Cartridge.ROMMapper == ROMMapper.Mapper000);
+
+			CPU = new NESCPU(this);
+			PPU = new NESPPU(this);
 
 			CPUMemoryMap.Clear();
 			PPUMemoryMap.Clear();
@@ -42,8 +45,6 @@ namespace Metazel
 			_nametableA = new byte[_nametableA.Length];
 			_nametableB = new byte[_nametableB.Length];
 
-			_ppuPaletteData = new byte[_ppuPaletteData.Length];
-
 			InitialiseCPUMemoryMap();
 			InitialisePPUMemoryMap();
 		}
@@ -52,8 +53,7 @@ namespace Metazel
 		{
 			if (Cartridge.VROMBanks.Length > 0)
 			{
-				PPUMemoryMap.Add(0, 0x1000, Cartridge.VROMBanks[0]);
-				PPUMemoryMap.Add(0x1000, 0x1000, new IndexedByteArray(Cartridge.VROMBanks[0], 0x1000));
+				PPUMemoryMap.Add(0, 0x2000, Cartridge.VROMBanks[0]);
 			}
 
 			switch (Cartridge.VRAMLayout)
@@ -84,11 +84,14 @@ namespace Metazel
 					throw new NotImplementedException();
 			}
 
-			PPUMemoryMap.Add(0x3F00, _ppuPaletteData.Length, _ppuPaletteData);
+			for (var i = 0x3F00; i < 0x4000; i += PPU.PPUPaletteData.Length)
+				PPUMemoryMap.Add(i, PPU.PPUPaletteData.Length, PPU.PPUPaletteData);
 
 			PPUMemoryMap.Add(0x4000, 0x4000, new MemoryMirror(PPUMemoryMap, 0, 0x4000));
 			PPUMemoryMap.Add(0x8000, 0x4000, new MemoryMirror(PPUMemoryMap, 0, 0x4000));
 			PPUMemoryMap.Add(0xC000, 0x4000, new MemoryMirror(PPUMemoryMap, 0, 0x4000));
+
+			PPUMemoryMap.PopulateTuplesList();
 		}
 
 		private void InitialiseCPUMemoryMap()
@@ -99,7 +102,7 @@ namespace Metazel
 			CPUMemoryMap.Add(_cpuRAM.Length * 3, _cpuRAM.Length, _cpuRAM);
 
 			for (var i = 0x2000; i < 0x4000; i += 8)
-				CPUMemoryMap.Add(i, 8, _ppuRegisters);
+				CPUMemoryMap.Add(i, 8, PPU.Registers);
 
 			CPUMemoryMap.Add(0x4000, 24, _cpuRegisters);
 
@@ -119,8 +122,7 @@ namespace Metazel
 			if (File.Exists(path))
 				File.Delete(path);
 
-			_cpu = new NESCPU(this);
-			_ppu = new NESPPU(this);
+			CPU.Initialize();
 
 			var i = 1;
 
@@ -131,31 +133,38 @@ namespace Metazel
 				switch (i)
 				{
 					case 1:
-						_ppu.DoCycle();
+						PPU.DoCycle();
 
 						i = 2;
 						break;
 					case 2:
-						_cpu.DoCycle();
+						PPU.DoCycle();
+						
+						CPU.DoCycle();
 
-						if (_cpu.TotalCycleCount % 1789772 == 0)
+						if (CPU.TotalCycleCount % 1789772 == 0)
 						{
 							Console.WriteLine(Environment.TickCount - previousTicks);
 
 							previousTicks = Environment.TickCount;
 						}
 
-						_ppu.DoCycle();
-
 						i = 3;
 						break;
 					case 3:
-						_ppu.DoCycle();
+						PPU.DoCycle();
 
 						i = 1;
 						break;
 				}
 			}
 		}
+
+		public void SetNewFrame(Bitmap frame)
+		{
+			NewFrame(frame);
+		}
+
+		public event Action<Bitmap> NewFrame;
 	}
 }

@@ -1,20 +1,17 @@
-﻿using System.Threading;
+﻿using System;
+using System.Windows.Forms;
 
 namespace Metazel
 {
-	internal static class Program
+	static class Program
 	{
-		private static void Main()
+		static void Main()
 		{
-			var cartridge = new NESCartridge("official_only.nes");
+			Console.BufferHeight = 32766;
 
-			var thread = new Thread(() => { });
-			thread.Priority = ThreadPriority.Highest;
-			
-
-			var engine = new NESEngine();
-			engine.Load(cartridge);
-			engine.Run();
+			Application.EnableVisualStyles();
+			Application.SetCompatibleTextRenderingDefault(false);
+			Application.Run(new MainForm());
 		}
 	}
 }
