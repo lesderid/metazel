@@ -21,6 +21,8 @@ namespace Metazel
 
 		private int _scanLine = 241;
 
+		public readonly byte[] OAMData = new byte[256];
+
 		public NESPPU(NESEngine engine)
 		{
 			_engine = engine;
@@ -109,7 +111,7 @@ namespace Metazel
 
 		private void DrawSprites(int i)
 		{
-			
+
 		}
 
 		private void DrawBackground(int i)

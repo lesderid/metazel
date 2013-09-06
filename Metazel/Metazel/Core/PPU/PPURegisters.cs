@@ -142,7 +142,7 @@ namespace Metazel
 						return status;
 					case 4:
 						Console.WriteLine("Reading 2004 ...");
-						return _ppu.Memory[OAMAddress];
+						return _ppu.OAMData[OAMAddress];
 					case 7:
 						var previousValue = _readBuffer;
 						_readBuffer = _ppu.Memory[_ppuAddress];
@@ -173,7 +173,7 @@ namespace Metazel
 						OAMAddress = value;
 						break;
 					case 4:
-						_ppu.Memory[OAMAddress] = value;
+						_ppu.OAMData[OAMAddress] = value;
 						OAMAddress++;
 						//if (value != 244)
 						//	Console.WriteLine("Writing 2004: #{0:X2} => ${1:X4}...", value, OAMAddress - 1);
