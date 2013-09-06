@@ -62,7 +62,7 @@ namespace Metazel
 
 			ROMMapper = (ROMMapper) (romMapperHigher << 4 | romMapperLower);
 
-			VRAMLayout = fourScreenVRAM ? VRAMLayout.FourScreenLayout : (mirroring ? VRAMLayout.HorizontalLayout : VRAMLayout.VerticalLayout);
+			NametableLayout = fourScreenVRAM ? NametableLayout.FourScreenLayout : (mirroring ? Metazel.NametableLayout.HorizontalLayout : Metazel.NametableLayout.VerticalLayout);
 
 			Region = isPAL ? Region.PAL : Region.NTSC;
 
@@ -88,7 +88,7 @@ namespace Metazel
 		public byte[] Trainer { get; private set; }
 
 		public Region Region { get; private set; }
-		public VRAMLayout VRAMLayout { get; private set; }
+		public NametableLayout NametableLayout { get; private set; }
 		public ROMMapper ROMMapper { get; private set; }
 
 		public bool VSSystem { get; private set; }

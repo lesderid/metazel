@@ -84,39 +84,11 @@ namespace Metazel
 			{
 				var i = Math.Abs(_frameData.Stride) * _scanLine + _dot * 3;
 
-				var tileNumber = _dot / 8 + (_scanLine / 8) * 32;
-				var tileId = Memory[Registers.NameTableAddress + tileNumber];
-				var tileX = _dot % 8;
-				var tileY = _scanLine % 8;
-				var byte1 = Memory[Registers.BackgroundPatternTableAddress + tileId * 16 + tileY];
-				var byte2 = Memory[Registers.BackgroundPatternTableAddress + tileId * 16 + tileY + 8];
-				var firstBit = byte1.GetBit(7 - tileX);
-				var secondBit = byte2.GetBit(7 - tileX);
+				if (Registers.BackgroundVisible)
+					DrawBackground(i);
 
-				var hyperTileX = _dot % 32;
-				var hyperTileY = _scanLine % 32;
-
-				int startBit;
-
-				if (hyperTileX >= 16)
-					startBit = hyperTileY >= 16 ? 6 : 2;
-				else
-					startBit = hyperTileY >= 16 ? 4 : 0;
-
-				var attributeNumber = _dot / 32 + (_scanLine / 32) * 8;
-				var attributePaletteByte = Memory[Registers.NameTableAddress + 32 * 30 + attributeNumber];
-
-				var paletteBit0 = attributePaletteByte.GetBit(startBit);
-				var paletteBit1 = attributePaletteByte.GetBit(startBit + 1);
-
-				var color = _palette[Memory[0x3F00 + (firstBit || secondBit ? ((byte) 0).SetBit(0, firstBit)
-																						.SetBit(1, secondBit)
-																						.SetBit(3, paletteBit1)
-																						.SetBit(2, paletteBit0) : 0)]];
-
-				_frameBytes[i] = color.B; //B
-				_frameBytes[i + 1] = color.G; //G
-				_frameBytes[i + 2] = color.R; //R
+				if (Registers.SpritesVisible)
+					DrawSprites(i);
 			}
 
 			if (_dot != 340)
@@ -130,6 +102,48 @@ namespace Metazel
 
 				_dot = 0;
 			}
+		}
+
+		private void DrawSprites(int i)
+		{
+			
+		}
+
+		private void DrawBackground(int i)
+		{
+			var tileNumber = _dot / 8 + (_scanLine / 8) * 32;
+			var tileId = Memory[Registers.NameTableAddress + tileNumber];
+			var tileX = _dot % 8;
+			var tileY = _scanLine % 8;
+			var byte1 = Memory[Registers.BackgroundPatternTableAddress + tileId * 16 + tileY];
+			var byte2 = Memory[Registers.BackgroundPatternTableAddress + tileId * 16 + tileY + 8];
+			var firstBit = byte1.GetBit(7 - tileX);
+			var secondBit = byte2.GetBit(7 - tileX);
+
+			var hyperTileX = _dot % 32;
+			var hyperTileY = _scanLine % 32;
+
+			int startBit;
+
+			if (hyperTileX >= 16)
+				startBit = hyperTileY >= 16 ? 6 : 2;
+			else
+				startBit = hyperTileY >= 16 ? 4 : 0;
+
+			var attributeNumber = _dot / 32 + (_scanLine / 32) * 8;
+			var attributePaletteByte = Memory[Registers.NameTableAddress + 32 * 30 + attributeNumber];
+
+			var paletteBit0 = attributePaletteByte.GetBit(startBit);
+			var paletteBit1 = attributePaletteByte.GetBit(startBit + 1);
+
+			var color = _palette[Memory[0x3F00 + (firstBit || secondBit ? ((byte) 0).SetBit(0, firstBit)
+																			  .SetBit(1, secondBit)
+																			  .SetBit(3, paletteBit1)
+																			  .SetBit(2, paletteBit0) : 0)]];
+
+			_frameBytes[i] = color.B; //B
+			_frameBytes[i + 1] = color.G; //G
+			_frameBytes[i + 2] = color.R; //R
 		}
 	}
 }

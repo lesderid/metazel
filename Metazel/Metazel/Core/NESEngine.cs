@@ -1,11 +1,7 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
 using System.IO;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Metazel
 {
@@ -25,6 +21,9 @@ namespace Metazel
 
 		public NESCPU CPU;
 		public NESPPU PPU;
+
+		public readonly JoypadHandler Joypad1 = new JoypadHandler(1);
+		public readonly JoypadHandler Joypad2 = new JoypadHandler(2);
 
 		public void Load(NESCartridge cartridge)
 		{
@@ -56,9 +55,9 @@ namespace Metazel
 				PPUMemoryMap.Add(0, 0x2000, Cartridge.VROMBanks[0]);
 			}
 
-			switch (Cartridge.VRAMLayout)
+			switch (Cartridge.NametableLayout)
 			{
-				case VRAMLayout.VerticalLayout:
+				case NametableLayout.VerticalLayout:
 					PPUMemoryMap.Add(0x2000, _nametableA.Length, _nametableA);
 					PPUMemoryMap.Add(0x2400, _nametableA.Length, _nametableA);
 					PPUMemoryMap.Add(0x2800, _nametableB.Length, _nametableB);
@@ -69,7 +68,7 @@ namespace Metazel
 					PPUMemoryMap.Add(0x3800, _nametableB.Length, _nametableB);
 					PPUMemoryMap.Add(0x3C00, _nametableB.Length - 0x100, _nametableB);
 					break;
-				case VRAMLayout.HorizontalLayout:
+				case NametableLayout.HorizontalLayout:
 					PPUMemoryMap.Add(0x2000, _nametableA.Length, _nametableA);
 					PPUMemoryMap.Add(0x2400, _nametableB.Length, _nametableB);
 					PPUMemoryMap.Add(0x2800, _nametableA.Length, _nametableA);
@@ -104,7 +103,10 @@ namespace Metazel
 			for (var i = 0x2000; i < 0x4000; i += 8)
 				CPUMemoryMap.Add(i, 8, PPU.Registers);
 
-			CPUMemoryMap.Add(0x4000, 24, _cpuRegisters);
+			CPUMemoryMap.Add(0x4000, 22, _cpuRegisters);
+
+			CPUMemoryMap.Add(0x4016, 1, Joypad1);
+			CPUMemoryMap.Add(0x4017, 1, Joypad2);
 
 			CPUMemoryMap.Add(0x4018, 0x1FE8, null); //Expansion ROM
 

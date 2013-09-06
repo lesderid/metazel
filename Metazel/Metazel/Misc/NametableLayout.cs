@@ -1,6 +1,6 @@
 namespace Metazel
 {
-	public enum VRAMLayout
+	public enum NametableLayout
 	{
 		VerticalLayout,
 		HorizontalLayout,

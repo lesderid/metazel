@@ -46,6 +46,12 @@
   <ItemGroup>
     <Reference Include="PresentationCore" />
     <Reference Include="PresentationFramework" />
+    <Reference Include="SharpDX">
+      <HintPath>..\..\..\..\..\..\..\Program Files (x86)\SharpDX\Bin\DirectX11-net40\SharpDX.dll</HintPath>
+    </Reference>
+    <Reference Include="SharpDX.DirectInput">
+      <HintPath>..\..\..\..\..\..\..\Program Files (x86)\SharpDX\Bin\DirectX11-net40\SharpDX.DirectInput.dll</HintPath>
+    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.Drawing" />
@@ -64,6 +70,7 @@
     <Compile Include="Core\CPU\InstructionMetadata.cs" />
     <Compile Include="Core\CPU\Interrupt.cs" />
     <Compile Include="Core\CPU\NESCPU.cs" />
+    <Compile Include="Core\JoypadHandler.cs" />
     <Compile Include="Core\PPU\NESPPU.cs" />
     <Compile Include="Core\PPU\PPURegisters.cs" />
     <Compile Include="MainForm.cs">
@@ -81,7 +88,7 @@
     <Compile Include="Core\NESEngine.cs" />
     <Compile Include="Misc\Region.cs" />
     <Compile Include="Misc\ROMMapper.cs" />
-    <Compile Include="Misc\VRAMLayout.cs" />
+    <Compile Include="Misc\NametableLayout.cs" />
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Program.cs" />
