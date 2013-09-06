@@ -89,6 +89,9 @@ namespace Metazel
 
 				if (Registers.SpritesVisible)
 					DrawSprites(i);
+
+				if (_dot >= 257 && _dot <= 320)
+					Registers.OAMAddress = 0;
 			}
 
 			if (_dot != 340)

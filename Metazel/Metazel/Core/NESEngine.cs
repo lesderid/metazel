@@ -24,6 +24,7 @@ namespace Metazel
 
 		public readonly JoypadHandler Joypad1 = new JoypadHandler(1);
 		public readonly JoypadHandler Joypad2 = new JoypadHandler(2);
+		private OAMDMA _oamDMA;
 
 		public void Load(NESCartridge cartridge)
 		{
@@ -35,6 +36,8 @@ namespace Metazel
 
 			CPU = new NESCPU(this);
 			PPU = new NESPPU(this);
+
+			_oamDMA = new OAMDMA(PPU, CPU);
 
 			CPUMemoryMap.Clear();
 			PPUMemoryMap.Clear();
@@ -103,8 +106,10 @@ namespace Metazel
 			for (var i = 0x2000; i < 0x4000; i += 8)
 				CPUMemoryMap.Add(i, 8, PPU.Registers);
 
-			CPUMemoryMap.Add(0x4000, 22, _cpuRegisters);
+			CPUMemoryMap.Add(0x4000, 20, _cpuRegisters);
 
+			CPUMemoryMap.Add(0x4014, 1, _oamDMA);
+			CPUMemoryMap.Add(0x4015, 1, _cpuRegisters);
 			CPUMemoryMap.Add(0x4016, 1, Joypad1);
 			CPUMemoryMap.Add(0x4017, 1, Joypad2);
 

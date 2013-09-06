@@ -1,29 +1,38 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
 
 namespace Metazel
 {
 	public class MemoryMap
 	{
+		private readonly Type _byteArrayType;
 		private readonly List<MemoryMapEntry> _map = new List<MemoryMapEntry>();
+		private readonly Type _memoryProviderType;
 
-		private Tuple<MemoryMapEntry, int>[] _entryAddressTuples;
+		private Tuple<int, Type, byte[], IMemoryProvider>[] _entryAddressTuples;
 		private bool _entryAddressTuplesDirty = true;
+
+		public MemoryMap()
+		{
+			_byteArrayType = typeof(byte[]);
+			_memoryProviderType = typeof(IMemoryProvider);
+		}
 
 		public byte this[int address]
 		{
 			get
 			{
 				var entryAddressTuple = Find(address);
-				var memoryProvider = entryAddressTuple.Item1.MemoryProvider;
-				var relativeAddress = entryAddressTuple.Item2;
+				var relativeAddress = entryAddressTuple.Item1;
+				var type = entryAddressTuple.Item2;
+				var byteArray = entryAddressTuple.Item3;
+				var memoryProvider = entryAddressTuple.Item4;
 
-				if (memoryProvider is byte[])
-					return ((byte[]) memoryProvider)[relativeAddress];
-				else if (memoryProvider is IMemoryProvider)
-					return ((IMemoryProvider) memoryProvider)[relativeAddress];
+				if (type == _byteArrayType)
+					return byteArray[relativeAddress];
+				else if (type == _memoryProviderType)
+					return memoryProvider[relativeAddress];
 				else
 				{
 					//Console.WriteLine("Reading from {0:X4}.", address); //TODO: Throw exception/don't allow other types of providers in Add().
@@ -35,13 +44,15 @@ namespace Metazel
 			set
 			{
 				var entryAddressTuple = Find(address);
-				var memoryProvider = entryAddressTuple.Item1.MemoryProvider;
-				var relativeAddress = entryAddressTuple.Item2;
+				var relativeAddress = entryAddressTuple.Item1;
+				var type = entryAddressTuple.Item2;
+				var byteArray = entryAddressTuple.Item3;
+				var memoryProvider = entryAddressTuple.Item4;
 
-				if (memoryProvider is byte[])
-					((byte[]) memoryProvider)[relativeAddress] = value;
-				else if (memoryProvider is IMemoryProvider)
-					((IMemoryProvider) memoryProvider)[relativeAddress] = value;
+				if (type == _byteArrayType)
+					byteArray[relativeAddress] = value;
+				else if (type == _memoryProviderType)
+					memoryProvider[relativeAddress] = value;
 				//else
 				//	Console.WriteLine("Writing {0:X2} to {1:X4}.", value, address); //TODO: Throw exception/don't allow other types of providers in Add().
 			}
@@ -60,7 +71,7 @@ namespace Metazel
 			this[address + 1] = bytes[1];
 		}
 
-		private Tuple<MemoryMapEntry, int> Find(int address)
+		private Tuple<int, Type, byte[], IMemoryProvider> Find(int address)
 		{
 			if (!_entryAddressTuplesDirty)
 				return _entryAddressTuples[address];
@@ -78,17 +89,33 @@ namespace Metazel
 			if (smaller != null && smaller.Start + smaller.Length - 1 < address)
 				smaller = null;
 
-			return smaller == null ? null : new Tuple<MemoryMapEntry, int>(smaller, address - smaller.Start);
+			Type type = null;
+			byte[] byteArray = null;
+			IMemoryProvider memoryProvider = null;
+
+			if (smaller != null && smaller.MemoryProvider != null)
+			{
+				if (smaller.MemoryProvider is byte[])
+				{
+					type = _byteArrayType;
+					byteArray = (byte[]) smaller.MemoryProvider;
+				}
+				else if (smaller.MemoryProvider is IMemoryProvider)
+				{
+					type = _memoryProviderType;
+					memoryProvider = (IMemoryProvider) smaller.MemoryProvider;
+				}
+			}
+
+			return smaller == null ? null : new Tuple<int, Type, byte[], IMemoryProvider>(address - smaller.Start, type, byteArray, memoryProvider);
 		}
 
 		public void PopulateTuplesList()
 		{
-			_entryAddressTuples = new Tuple<MemoryMapEntry, int>[ushort.MaxValue + 1];
+			_entryAddressTuples = new Tuple<int, Type, byte[], IMemoryProvider>[ushort.MaxValue + 1];
 
 			for (var i = 0; i < _entryAddressTuples.Length; i++)
-			{
 				_entryAddressTuples[i] = Find(i);
-			}
 
 			_entryAddressTuplesDirty = false;
 		}

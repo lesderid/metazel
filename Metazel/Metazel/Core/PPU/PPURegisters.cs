@@ -9,7 +9,7 @@ namespace Metazel
 		private byte _ppuCtrl; //$2000
 		private byte _ppuMask; //$2001
 		private byte _ppuStatus; //$2002
-		private byte _oamAddr; //$2003
+		public byte OAMAddress; //$2003
 		private byte _oamData; //$2004
 		private byte _ppuData; //$2007
 
@@ -117,6 +117,7 @@ namespace Metazel
 
 		public byte VerticalScroll { get; private set; }
 		public byte HorizontalScroll { get; private set; }
+
 		private bool _writingHorizontalScroll;
 
 		private ushort _ppuAddress;
@@ -141,7 +142,7 @@ namespace Metazel
 						return status;
 					case 4:
 						Console.WriteLine("Reading 2004 ...");
-						break;
+						return _ppu.Memory[OAMAddress];
 					case 7:
 						var previousValue = _readBuffer;
 						_readBuffer = _ppu.Memory[_ppuAddress];
@@ -169,10 +170,13 @@ namespace Metazel
 						_ppuMask = value;
 						break;
 					case 3:
-						//Console.WriteLine("Writing 2003 : ${0:X2}...", value);
+						OAMAddress = value;
 						break;
 					case 4:
-						Console.WriteLine("Writing 2004 ...");
+						_ppu.Memory[OAMAddress] = value;
+						OAMAddress++;
+						//if (value != 244)
+						//	Console.WriteLine("Writing 2004: #{0:X2} => ${1:X4}...", value, OAMAddress - 1);
 						break;
 					case 5:
 						if (_writingHorizontalScroll)
@@ -191,7 +195,7 @@ namespace Metazel
 						_ppuAddrSecondByte = !_ppuAddrSecondByte;
 						break;
 					case 7:
-						if(_ppuAddress == 0x3F10)
+						if (_ppuAddress == 0x3F10)
 							_ppu.Memory[0x3F00] = value; //HACK: Fixes SMB background. Correct fix: implementing palette mirroring.
 						else
 							_ppu.Memory[_ppuAddress] = value;

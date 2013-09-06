@@ -71,6 +71,7 @@
     <Compile Include="Core\CPU\Interrupt.cs" />
     <Compile Include="Core\CPU\NESCPU.cs" />
     <Compile Include="Core\JoypadHandler.cs" />
+    <Compile Include="Core\CPU\OAMDMA.cs" />
     <Compile Include="Core\PPU\NESPPU.cs" />
     <Compile Include="Core\PPU\PPURegisters.cs" />
     <Compile Include="MainForm.cs">
