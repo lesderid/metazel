@@ -141,7 +141,6 @@ namespace Metazel
 						VBlank = false;
 						return status;
 					case 4:
-						Console.WriteLine("Reading 2004 ...");
 						return _ppu.OAMData[OAMAddress];
 					case 7:
 						var previousValue = _readBuffer;
@@ -175,8 +174,6 @@ namespace Metazel
 					case 4:
 						_ppu.OAMData[OAMAddress] = value;
 						OAMAddress++;
-						//if (value != 244)
-						//	Console.WriteLine("Writing 2004: #{0:X2} => ${1:X4}...", value, OAMAddress - 1);
 						break;
 					case 5:
 						if (_writingHorizontalScroll)

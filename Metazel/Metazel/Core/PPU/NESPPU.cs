@@ -7,6 +7,7 @@ namespace Metazel
 {
 	public class NESPPU
 	{
+		public readonly byte[] OAMData = new byte[256];
 		public readonly byte[] PPUPaletteData = new byte[0x20];
 		public readonly PPURegisters Registers;
 		private readonly NESEngine _engine;
@@ -21,7 +22,8 @@ namespace Metazel
 
 		private int _scanLine = 241;
 
-		public readonly byte[] OAMData = new byte[256];
+		private Color?[,] _spriteCacheBack;
+		private Color?[,] _spriteCacheFront;
 
 		public NESPPU(NESEngine engine)
 		{
@@ -44,9 +46,7 @@ namespace Metazel
 			_palette = new Color[colorPalette.Length];
 
 			for (var i = 0; i < colorPalette.Length; i++)
-			{
 				_palette[i] = Color.FromArgb(colorPalette[i]);
-			}
 		}
 
 		public MemoryMap Memory
@@ -81,16 +81,24 @@ namespace Metazel
 
 				_frame = new Bitmap(256, 240, PixelFormat.Format24bppRgb);
 				_frameData = _frame.LockBits(_frameRectangle, ImageLockMode.ReadWrite, PixelFormat.Format24bppRgb);
+
+				_spriteCacheBack = new Color?[256, 240];
+				_spriteCacheFront = new Color?[256, 240];
+
+				CacheSprites();
 			}
 			else if (_scanLine >= 0 && _scanLine < 240 && _dot >= 0 && _dot < 256)
 			{
 				var i = Math.Abs(_frameData.Stride) * _scanLine + _dot * 3;
 
+				if (Registers.SpritesVisible)
+					DrawSpritesBack(i);
+
 				if (Registers.BackgroundVisible)
 					DrawBackground(i);
 
 				if (Registers.SpritesVisible)
-					DrawSprites(i);
+					DrawSpritesFront(i);
 
 				if (_dot >= 257 && _dot <= 320)
 					Registers.OAMAddress = 0;
@@ -109,9 +117,90 @@ namespace Metazel
 			}
 		}
 
-		private void DrawSprites(int i)
+		private void CacheSprites()
 		{
+			for (var j = 0; j < 256; j += 4)
+			{
+				var y = OAMData[j];
+				var tileIndex = OAMData[j + 1];
+				var attributes = OAMData[j + 2];
+				var x = OAMData[j + 3];
 
+				if (y >= 0xEF || x >= 0xF9)
+					continue;
+
+				for (var dot = x; dot < x + 8 && dot >= x; dot++)
+				{
+					for (var scanLine = y; scanLine < y + 8 && scanLine < 240; scanLine++)
+					{
+						var tileX = (dot - x) % 8;
+						var tileY = (scanLine - y) % 8;
+
+						if (dot < x)
+							continue;
+
+						int patternTableAddress;
+						if (Registers.LargeSprites)
+							throw new NotImplementedException();
+						else
+							patternTableAddress = Registers.SpritePatternTableAddress;
+
+						if (attributes.GetBit(7))
+							tileY = 7 - tileY;
+
+						var byte1 = Memory[patternTableAddress + tileIndex * 16 + tileY];
+						var byte2 = Memory[patternTableAddress + tileIndex * 16 + tileY + 8];
+
+						if (attributes.GetBit(6))
+						{
+							byte1 = byte1.ReverseBits();
+							byte2 = byte2.ReverseBits();
+						}
+
+						var firstBit = byte1.GetBit(7 - tileX);
+						var secondBit = byte2.GetBit(7 - tileX);
+
+						if (!(firstBit || secondBit))
+							continue;
+
+						var color = _palette[Memory[0x3F10 + ((byte) 0)
+							                                     .SetBit(0, firstBit)
+							                                     .SetBit(1, secondBit)
+							                                     .SetBit(2, attributes.GetBit(0))
+							                                     .SetBit(3, attributes.GetBit(1))]];
+
+						if (attributes.GetBit(5))
+							_spriteCacheBack[dot, scanLine] = color;
+						else
+							_spriteCacheFront[dot, scanLine] = color;
+					}
+
+				}
+			}
+		}
+
+		private void DrawSpritesBack(int i)
+		{
+			var color = _spriteCacheBack[_dot, _scanLine];
+
+			if (color == null)
+				return;
+
+			_frameBytes[i] = ((Color) color).B; //B
+			_frameBytes[i + 1] = ((Color) color).G; //G
+			_frameBytes[i + 2] = ((Color) color).R; //R
+		}
+
+		private void DrawSpritesFront(int i)
+		{
+			var color = _spriteCacheFront[_dot, _scanLine];
+
+			if (color == null)
+				return;
+
+			_frameBytes[i] = ((Color) color).B; //B
+			_frameBytes[i + 1] = ((Color) color).G; //G
+			_frameBytes[i + 2] = ((Color) color).R; //R
 		}
 
 		private void DrawBackground(int i)
@@ -141,10 +230,11 @@ namespace Metazel
 			var paletteBit0 = attributePaletteByte.GetBit(startBit);
 			var paletteBit1 = attributePaletteByte.GetBit(startBit + 1);
 
-			var color = _palette[Memory[0x3F00 + (firstBit || secondBit ? ((byte) 0).SetBit(0, firstBit)
+			var color = _palette[Memory[0x3F00 + (firstBit || secondBit ? ((byte) 0)
+																			  .SetBit(0, firstBit)
 																			  .SetBit(1, secondBit)
-																			  .SetBit(3, paletteBit1)
-																			  .SetBit(2, paletteBit0) : 0)]];
+																			  .SetBit(2, paletteBit0)
+																			  .SetBit(3, paletteBit1) : 0)]];
 
 			_frameBytes[i] = color.B; //B
 			_frameBytes[i + 1] = color.G; //G
