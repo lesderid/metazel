@@ -1,6 +1,8 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Imaging;
+using System.Linq;
 using System.Runtime.InteropServices;
 
 namespace Metazel
@@ -56,7 +58,7 @@ namespace Metazel
 
 		public void DoCycle()
 		{
-			//TODO: Correctly implement PPU.
+			//TODO: Correctly implement PPU. (Is this necessary?)
 
 			if (_scanLine == 240 && _dot == 0)
 			{
@@ -84,6 +86,8 @@ namespace Metazel
 
 				_spriteCacheBack = new Color?[256, 240];
 				_spriteCacheFront = new Color?[256, 240];
+
+				_sprite0Coordinates = new List<Tuple<int, int>>();
 
 				CacheSprites();
 			}
@@ -116,6 +120,8 @@ namespace Metazel
 				_dot = 0;
 			}
 		}
+
+		private List<Tuple<int, int>> _sprite0Coordinates;
 
 		private void CacheSprites()
 		{
@@ -164,15 +170,18 @@ namespace Metazel
 							continue;
 
 						var color = _palette[Memory[0x3F10 + ((byte) 0)
-							                                     .SetBit(0, firstBit)
-							                                     .SetBit(1, secondBit)
-							                                     .SetBit(2, attributes.GetBit(0))
-							                                     .SetBit(3, attributes.GetBit(1))]];
+																 .SetBit(0, firstBit)
+																 .SetBit(1, secondBit)
+																 .SetBit(2, attributes.GetBit(0))
+																 .SetBit(3, attributes.GetBit(1))]];
 
 						if (attributes.GetBit(5))
 							_spriteCacheBack[dot, scanLine] = color;
 						else
 							_spriteCacheFront[dot, scanLine] = color;
+
+						if (j == 0)
+							_sprite0Coordinates.Add(new Tuple<int, int>(dot, scanLine));
 					}
 
 				}
@@ -239,6 +248,13 @@ namespace Metazel
 			_frameBytes[i] = color.B; //B
 			_frameBytes[i + 1] = color.G; //G
 			_frameBytes[i + 2] = color.R; //R
+
+			if (_sprite0Coordinates != null && (firstBit || secondBit) && _sprite0Coordinates.Any(c => c.Item1 == _dot && c.Item2 == _scanLine))
+			{
+				Registers.Sprite0Hit = true;
+
+				_sprite0Coordinates = null;
+			}
 		}
 	}
 }
