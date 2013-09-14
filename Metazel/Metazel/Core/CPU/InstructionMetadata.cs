@@ -320,11 +320,14 @@ namespace Metazel
 
 			var value = Memory[address];
 
-			var intResult = A + value + 1;
+			//TODO: Fix addition part.
 
-			C = intResult > byte.MaxValue;
-			V = intResult > 1 << 7 && (sbyte) intResult != (sbyte) A + (sbyte) value + 1;
-			A = (byte) intResult;
+			var unsignedResult = A + (uint) value + (uint) (C ? 1 : 0);
+
+			C = unsignedResult > byte.MaxValue;
+			V = ((value ^ unsignedResult) & (A ^ unsignedResult) & 0x80) != 0;
+			
+			A = (byte) unsignedResult;
 
 			Z = A == 0;
 			N = A.GetBit(7);
@@ -532,10 +535,12 @@ namespace Metazel
 					break;
 			}
 
-			var intResult = A - value - 1 + (C ? 1 : 0);
+			var unsignedResult = A + (byte) ~value + (uint) (C ? 1 : 0);
 
-			V = (sbyte) A < intResult && (sbyte) intResult != (sbyte) A - (sbyte) value - 1 + (C ? 1 : 0);
-			A = (byte) intResult;
+			C = unsignedResult > byte.MaxValue;
+			V = (((byte) ~value ^ unsignedResult) & (A ^ unsignedResult) & 0x80) != 0;
+
+			A = (byte) unsignedResult;
 
 			Z = A == 0;
 			N = A.GetBit(7);
@@ -710,13 +715,13 @@ namespace Metazel
 						break;
 					}
 				case AddressingMode.ZeroPageX:
-					C = Memory[operands[0] + X].GetBit(7);
+					C = Memory[(byte) (operands[0] + X)].GetBit(7);
 
-					Memory[operands[0] + X] <<= 1;
-					Memory[operands[0] + X] = Memory[operands[0] + X].SetBit(0, oldCarry);
+					Memory[(byte) (operands[0] + X)] <<= 1;
+					Memory[(byte) (operands[0] + X)] = Memory[(byte) (operands[0] + X)].SetBit(0, oldCarry);
 
-					Z = Memory[operands[0] + X] == 0;
-					N = Memory[operands[0] + X].GetBit(7);
+					Z = Memory[(byte) (operands[0] + X)] == 0;
+					N = Memory[(byte) (operands[0] + X)].GetBit(7);
 					break;
 				case AddressingMode.AbsoluteX:
 					{
@@ -772,13 +777,13 @@ namespace Metazel
 						break;
 					}
 				case AddressingMode.ZeroPageX:
-					C = Memory[operands[0] + X].GetBit(0);
+					C = Memory[(byte) (operands[0] + X)].GetBit(0);
 
-					Memory[operands[0] + X] >>= 1;
-					Memory[operands[0] + X] = Memory[operands[0] + X].SetBit(7, oldCarry);
+					Memory[(byte) (operands[0] + X)] >>= 1;
+					Memory[(byte) (operands[0] + X)] = Memory[(byte) (operands[0] + X)].SetBit(7, oldCarry);
 
-					Z = Memory[operands[0] + X] == 0;
-					N = Memory[operands[0] + X].GetBit(7);
+					Z = Memory[(byte) (operands[0] + X)] == 0;
+					N = Memory[(byte) (operands[0] + X)].GetBit(7);
 					break;
 				case AddressingMode.AbsoluteX:
 					{
@@ -829,12 +834,12 @@ namespace Metazel
 						break;
 					}
 				case AddressingMode.ZeroPageX:
-					C = Memory[operands[0] + X].GetBit(7);
+					C = Memory[(byte) (operands[0] + X)].GetBit(7);
 
-					Memory[operands[0] + X] <<= 1;
+					Memory[(byte) (operands[0] + X)] <<= 1;
 
-					Z = Memory[operands[0] + X] == 0;
-					N = Memory[operands[0] + X].GetBit(7);
+					Z = Memory[(byte) (operands[0] + X)] == 0;
+					N = Memory[(byte) (operands[0] + X)].GetBit(7);
 					break;
 				case AddressingMode.AbsoluteX:
 					{
@@ -885,12 +890,12 @@ namespace Metazel
 						break;
 					}
 				case AddressingMode.ZeroPageX:
-					C = Memory[operands[0] + X].GetBit(0);
+					C = Memory[(byte) (operands[0] + X)].GetBit(0);
 
-					Memory[operands[0] + X] >>= 1;
+					Memory[(byte) (operands[0] + X)] >>= 1;
 
-					Z = Memory[operands[0] + X] == 0;
-					N = Memory[operands[0] + X].GetBit(7);
+					Z = Memory[(byte) (operands[0] + X)] == 0;
+					N = Memory[(byte) (operands[0] + X)].GetBit(7);
 					break;
 				case AddressingMode.AbsoluteX:
 					{
@@ -992,10 +997,10 @@ namespace Metazel
 						break;
 					}
 				case AddressingMode.ZeroPageX:
-					Memory[operands[0] + X]--;
+					Memory[(byte) (operands[0] + X)]--;
 
-					Z = Memory[operands[0] + X] == 0;
-					N = Memory[operands[0] + X].GetBit(7);
+					Z = Memory[(byte) (operands[0] + X)] == 0;
+					N = Memory[(byte) (operands[0] + X)].GetBit(7);
 					break;
 				case AddressingMode.AbsoluteX:
 					{
@@ -1047,10 +1052,10 @@ namespace Metazel
 						break;
 					}
 				case AddressingMode.ZeroPageX:
-					Memory[operands[0] + X]++;
+					Memory[(byte) (operands[0] + X)]++;
 
-					Z = Memory[operands[0] + X] == 0;
-					N = Memory[operands[0] + X].GetBit(7);
+					Z = Memory[(byte) (operands[0] + X)] == 0;
+					N = Memory[(byte) (operands[0] + X)].GetBit(7);
 					break;
 				case AddressingMode.AbsoluteX:
 					{
@@ -1111,11 +1116,12 @@ namespace Metazel
 					}
 			}
 
-			var intResult = A + value + (C ? 1 : 0);
+			var unsignedResult = A + (uint) value + (uint) (C ? 1 : 0);
 
-			C = intResult > byte.MaxValue;
-			V = intResult > 1 << 7 && (sbyte) intResult != (sbyte) A + (sbyte) value + (C ? 1 : 0);
-			A = (byte) intResult;
+			C = unsignedResult > byte.MaxValue;
+			V = ((value ^ unsignedResult) & (A ^ unsignedResult) & 0x80) != 0;
+			
+			A = (byte) unsignedResult;
 
 			Z = A == 0;
 			N = A.GetBit(7);
@@ -1167,11 +1173,12 @@ namespace Metazel
 					}
 			}
 
-			var intResult = A - value - 1 + (C ? 1 : 0);
+			var unsignedResult = A + (byte)~value + (uint) (C ? 1 : 0);
 
-			C = (byte) intResult < byte.MaxValue;
-			V = (sbyte) A < intResult && (sbyte) intResult != (sbyte) A - (sbyte) value - 1 + (C ? 1 : 0);
-			A = (byte) intResult;
+			C = unsignedResult > byte.MaxValue;
+			V = (((byte) ~value ^ unsignedResult) & (A ^ unsignedResult) & 0x80) != 0;
+
+			A = (byte) unsignedResult;
 
 			Z = A == 0;
 			N = A.GetBit(7);
@@ -1481,7 +1488,7 @@ namespace Metazel
 		{
 			Push((ushort) (PC - 1));
 
-			PC = BitConverter.ToUInt16(operands, 0); 
+			PC = BitConverter.ToUInt16(operands, 0);
 		}
 
 		private void STA(InstructionMetadata metadata, byte[] operands)

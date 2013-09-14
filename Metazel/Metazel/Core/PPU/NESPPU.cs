@@ -121,7 +121,7 @@ namespace Metazel
 		{
 			for (var j = 0; j < 256; j += 4)
 			{
-				var y = OAMData[j];
+				var y = OAMData[j] + 1;
 				var tileIndex = OAMData[j + 1];
 				var attributes = OAMData[j + 2];
 				var x = OAMData[j + 3];

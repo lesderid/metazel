@@ -11,6 +11,7 @@ namespace Metazel
 		public readonly MemoryMap PPUMemoryMap = new MemoryMap();
 
 		private byte[] _cpuRAM = new byte[0x800];
+		private byte[] _ppuRAM;
 
 		private object _cpuRegisters;
 
@@ -56,6 +57,12 @@ namespace Metazel
 			if (Cartridge.VROMBanks.Length > 0)
 			{
 				PPUMemoryMap.Add(0, 0x2000, Cartridge.VROMBanks[0]);
+			}
+			else
+			{
+				_ppuRAM = new byte[0x2000];
+
+				PPUMemoryMap.Add(0, 0x2000, _ppuRAM);
 			}
 
 			switch (Cartridge.NametableLayout)
