@@ -10,8 +10,6 @@ namespace Metazel
 		private byte _ppuMask; //$2001
 		private byte _ppuStatus; //$2002
 		public byte OAMAddress; //$2003
-		private byte _oamData; //$2004
-		private byte _ppuData; //$2007
 
 		private readonly NESPPU _ppu;
 		private readonly NESEngine _engine;
@@ -118,10 +116,9 @@ namespace Metazel
 		public byte VerticalScroll { get; private set; }
 		public byte HorizontalScroll { get; private set; }
 
-		private bool _writingHorizontalScroll;
+		private bool _writeLatch;
 
 		private ushort _ppuAddress;
-		private bool _ppuAddrSecondByte;
 
 		private byte _readBuffer = 0xE8; //TODO: Find out if this is the correct start buffer.
 
@@ -134,8 +131,7 @@ namespace Metazel
 				switch (address)
 				{
 					case 2:
-						_writingHorizontalScroll = false;
-						_ppuAddrSecondByte = false;
+						_writeLatch = false;
 
 						var status = _ppuStatus;
 						VBlank = false;
@@ -176,20 +172,20 @@ namespace Metazel
 						OAMAddress++;
 						break;
 					case 5:
-						if (_writingHorizontalScroll)
-							HorizontalScroll = value;
-						else
+						if (_writeLatch)
 							VerticalScroll = value;
-
-						_writingHorizontalScroll = !_writingHorizontalScroll;
+						else
+							HorizontalScroll = value;
+							
+						_writeLatch = !_writeLatch;
 						break;
 					case 6:
-						if (_ppuAddrSecondByte)
+						if (_writeLatch)
 							_ppuAddress |= value;
 						else
 							_ppuAddress = (ushort) (value << 8);
 
-						_ppuAddrSecondByte = !_ppuAddrSecondByte;
+						_writeLatch = !_writeLatch;
 						break;
 					case 7:
 						if (_ppuAddress == 0x3F10)

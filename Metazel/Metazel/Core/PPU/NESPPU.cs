@@ -4,6 +4,7 @@ using System.Drawing;
 using System.Drawing.Imaging;
 using System.Linq;
 using System.Runtime.InteropServices;
+using System.Threading.Tasks;
 
 namespace Metazel
 {
@@ -95,6 +96,12 @@ namespace Metazel
 			{
 				var i = Math.Abs(_frameData.Stride) * _scanLine + _dot * 3;
 
+				if (_dot == 0)
+				{
+					_horizontalScroll = Registers.HorizontalScroll;
+					_verticalScroll = Registers.VerticalScroll;
+				}
+
 				if (Registers.SpritesVisible)
 					DrawSpritesBack(i);
 
@@ -122,18 +129,23 @@ namespace Metazel
 		}
 
 		private List<Tuple<int, int>> _sprite0Coordinates;
+		
+		private byte _horizontalScroll;
+		private byte _verticalScroll;
 
 		private void CacheSprites()
 		{
-			for (var j = 0; j < 256; j += 4)
+			Parallel.For(0, 64, attributeJ =>
 			{
+				var j = attributeJ * 4;
+
 				var y = OAMData[j] + 1;
 				var tileIndex = OAMData[j + 1];
 				var attributes = OAMData[j + 2];
 				var x = OAMData[j + 3];
 
 				if (y >= 0xEF || x >= 0xF9)
-					continue;
+					return;
 
 				for (var dot = x; dot < x + 8 && dot >= x; dot++)
 				{
@@ -185,7 +197,7 @@ namespace Metazel
 					}
 
 				}
-			}
+			});
 		}
 
 		private void DrawSpritesBack(int i)
@@ -214,17 +226,33 @@ namespace Metazel
 
 		private void DrawBackground(int i)
 		{
-			var tileNumber = _dot / 8 + (_scanLine / 8) * 32;
-			var tileId = Memory[Registers.NameTableAddress + tileNumber];
-			var tileX = _dot % 8;
-			var tileY = _scanLine % 8;
+			var x = _dot + _horizontalScroll;
+			var y = _scanLine + _verticalScroll;
+
+			var nextNameTableX = new Func<int, int>(address => (address - 0x2000 + 0x400) % 0x800 + 0x2000);
+			var nextNameTableY = new Func<int, int>(address => (address - 0x2000 + 0x800) % 0x1000 + 0x2000);
+			var nameTableAddress = Registers.NameTableAddress;
+
+			for (var j = 0; j < x / 256; j++)
+				nameTableAddress = nextNameTableX(nameTableAddress);
+
+			for (var j = 0; j < y / 240; j++)
+				nameTableAddress = nextNameTableY(nameTableAddress);
+
+			x %= 256;
+			y %= 240;
+
+			var tileNumber = x / 8 + (y / 8) * 32;
+			var tileId = Memory[nameTableAddress + tileNumber];
+			var tileX = x % 8;
+			var tileY = y % 8;
 			var byte1 = Memory[Registers.BackgroundPatternTableAddress + tileId * 16 + tileY];
 			var byte2 = Memory[Registers.BackgroundPatternTableAddress + tileId * 16 + tileY + 8];
 			var firstBit = byte1.GetBit(7 - tileX);
 			var secondBit = byte2.GetBit(7 - tileX);
 
-			var hyperTileX = _dot % 32;
-			var hyperTileY = _scanLine % 32;
+			var hyperTileX = x % 32;
+			var hyperTileY = y % 32;
 
 			int startBit;
 
@@ -233,8 +261,8 @@ namespace Metazel
 			else
 				startBit = hyperTileY >= 16 ? 4 : 0;
 
-			var attributeNumber = _dot / 32 + (_scanLine / 32) * 8;
-			var attributePaletteByte = Memory[Registers.NameTableAddress + 32 * 30 + attributeNumber];
+			var attributeNumber = x / 32 + (y / 32) * 8;
+			var attributePaletteByte = Memory[nameTableAddress + 32 * 30 + attributeNumber];
 
 			var paletteBit0 = attributePaletteByte.GetBit(startBit);
 			var paletteBit1 = attributePaletteByte.GetBit(startBit + 1);
@@ -249,11 +277,19 @@ namespace Metazel
 			_frameBytes[i + 1] = color.G; //G
 			_frameBytes[i + 2] = color.R; //R
 
-			if (_sprite0Coordinates != null && (firstBit || secondBit) && _sprite0Coordinates.Any(c => c.Item1 == _dot && c.Item2 == _scanLine))
+			if (_sprite0Coordinates != null && (firstBit || secondBit))
 			{
-				Registers.Sprite0Hit = true;
+				for (var j = 0; j < _sprite0Coordinates.Count; j++)
+				{
+					if (_sprite0Coordinates[j].Item1 == _dot && _sprite0Coordinates[j].Item2 == _scanLine)
+					{
+						Registers.Sprite0Hit = true;
 
-				_sprite0Coordinates = null;
+						_sprite0Coordinates = null;
+
+						break;
+					}
+				}
 			}
 		}
 	}

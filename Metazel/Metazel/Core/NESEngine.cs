@@ -27,6 +27,8 @@ namespace Metazel
 		public readonly JoypadHandler Joypad2 = new JoypadHandler(2);
 		private OAMDMA _oamDMA;
 
+		private int _frames = 0;
+
 		public void Load(NESCartridge cartridge)
 		{
 			//TODO: Change memory map based on mapper type.
@@ -50,6 +52,8 @@ namespace Metazel
 
 			InitialiseCPUMemoryMap();
 			InitialisePPUMemoryMap();
+
+			NewFrame += (Action<Bitmap>) delegate { _frames++; };
 		}
 
 		private void InitialisePPUMemoryMap()
@@ -153,14 +157,16 @@ namespace Metazel
 						break;
 					case 2:
 						PPU.DoCycle();
-						
+
 						CPU.DoCycle();
 
+						var ticks = Environment.TickCount - previousTicks;
 						if (CPU.TotalCycleCount % 1789772 == 0)
 						{
-							Console.WriteLine(Environment.TickCount - previousTicks);
+							Console.WriteLine("{0} ({1})", ticks, _frames / (ticks / 1000f));
 
 							previousTicks = Environment.TickCount;
+							_frames = 0;
 						}
 
 						i = 3;
