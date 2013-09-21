@@ -97,8 +97,8 @@ namespace Metazel
 					throw new NotImplementedException();
 			}
 
-			for (var i = 0x3F00; i < 0x4000; i += PPU.PPUPaletteData.Length)
-				PPUMemoryMap.Add(i, PPU.PPUPaletteData.Length, PPU.PPUPaletteData);
+			for (var i = 0x3F00; i < 0x4000; i += 0x20)
+				PPUMemoryMap.Add(i, 0x20, PPU.PPUPaletteData);
 
 			PPUMemoryMap.Add(0x4000, 0x4000, new MemoryMirror(PPUMemoryMap, 0, 0x4000));
 			PPUMemoryMap.Add(0x8000, 0x4000, new MemoryMirror(PPUMemoryMap, 0, 0x4000));

@@ -119,6 +119,7 @@ namespace Metazel
 		private bool _writeLatch;
 
 		private ushort _ppuAddress;
+		private ushort _ppuAddressBuffer;
 
 		private byte _readBuffer = 0xE8; //TODO: Find out if this is the correct start buffer.
 
@@ -139,10 +140,21 @@ namespace Metazel
 					case 4:
 						return _ppu.OAMData[OAMAddress];
 					case 7:
-						var previousValue = _readBuffer;
-						_readBuffer = _ppu.Memory[_ppuAddress];
+						byte returnValue;
+						if(_ppuAddress < 0x3F00)
+						{
+							var previousValue = _readBuffer;
+							_readBuffer = _ppu.Memory[_ppuAddress];
+							returnValue = previousValue;
+						}
+						else
+						{
+							_readBuffer = _ppu.Memory[_ppuAddress - 0x1000];
+							returnValue = _ppu.Memory[_ppuAddress];
+						}
+
 						_ppuAddress += (ushort) AddressIncrementAmount;
-						return _ppuAddress >= 0x3F00 ? _readBuffer : previousValue;
+						return returnValue;
 					default:
 						Console.WriteLine("Reading {0:X4} (?) ...", 0x2000 + address);
 
@@ -176,22 +188,22 @@ namespace Metazel
 							VerticalScroll = value;
 						else
 							HorizontalScroll = value;
-							
+
 						_writeLatch = !_writeLatch;
 						break;
 					case 6:
 						if (_writeLatch)
-							_ppuAddress |= value;
+						{
+							_ppuAddressBuffer |= value;
+							_ppuAddress = _ppuAddressBuffer;
+						}
 						else
-							_ppuAddress = (ushort) (value << 8);
+							_ppuAddressBuffer = (ushort) (value << 8);
 
 						_writeLatch = !_writeLatch;
 						break;
 					case 7:
-						if (_ppuAddress == 0x3F10)
-							_ppu.Memory[0x3F00] = value; //HACK: Fixes SMB background. Correct fix: implementing palette mirroring.
-						else
-							_ppu.Memory[_ppuAddress] = value;
+						_ppu.Memory[_ppuAddress] = value;
 						_ppuAddress += (ushort) AddressIncrementAmount;
 						break;
 					default:

@@ -11,7 +11,7 @@ namespace Metazel
 	public class NESPPU
 	{
 		public readonly byte[] OAMData = new byte[256];
-		public readonly byte[] PPUPaletteData = new byte[0x20];
+		public readonly PPUPaletteData PPUPaletteData = new PPUPaletteData();
 		public readonly PPURegisters Registers;
 		private readonly NESEngine _engine;
 
