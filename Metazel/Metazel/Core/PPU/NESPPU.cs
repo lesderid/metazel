@@ -159,7 +159,7 @@ namespace Metazel
 
 						int patternTableAddress;
 						if (Registers.LargeSprites)
-							throw new NotImplementedException();
+							continue;
 						else
 							patternTableAddress = Registers.SpritePatternTableAddress;
 
@@ -267,11 +267,12 @@ namespace Metazel
 			var paletteBit0 = attributePaletteByte.GetBit(startBit);
 			var paletteBit1 = attributePaletteByte.GetBit(startBit + 1);
 
-			var color = _palette[Memory[0x3F00 + (firstBit || secondBit ? ((byte) 0)
-																			  .SetBit(0, firstBit)
-																			  .SetBit(1, secondBit)
-																			  .SetBit(2, paletteBit0)
-																			  .SetBit(3, paletteBit1) : 0)]];
+			var blah = Memory[0x3F00 + (firstBit || secondBit ? ((byte) 0)
+				                                                    .SetBit(0, firstBit)
+				                                                    .SetBit(1, secondBit)
+				                                                    .SetBit(2, paletteBit0)
+				                                                    .SetBit(3, paletteBit1) : 0)];
+			var color = _palette[blah & 0x3F];
 
 			_frameBytes[i] = color.B; //B
 			_frameBytes[i + 1] = color.G; //G

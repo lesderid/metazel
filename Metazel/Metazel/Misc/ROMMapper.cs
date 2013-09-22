@@ -2,6 +2,7 @@ namespace Metazel
 {
 	public enum ROMMapper
 	{
-		Mapper000 = 0
+		NROM = 0,
+		SxROM = 1
 	}
 }

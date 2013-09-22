@@ -62,7 +62,7 @@ namespace Metazel
 
 			ROMMapper = (ROMMapper) (romMapperHigher << 4 | romMapperLower);
 
-			NametableLayout = fourScreenVRAM ? NametableLayout.FourScreenLayout : (mirroring ? Metazel.NametableLayout.HorizontalLayout : Metazel.NametableLayout.VerticalLayout);
+			NametableLayout = fourScreenVRAM ? NametableLayout.FourScreenLayout : (mirroring ? NametableLayout.HorizontalLayout : NametableLayout.VerticalLayout);
 
 			Region = isPAL ? Region.PAL : Region.NTSC;
 
