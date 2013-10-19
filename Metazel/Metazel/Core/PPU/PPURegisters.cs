@@ -1,8 +1,9 @@
 using System;
 using System.Diagnostics;
 using System.IO;
+using Metazel.Library;
 
-namespace Metazel
+namespace Metazel.NES
 {
 	public class PPURegisters : IMemoryProvider
 	{

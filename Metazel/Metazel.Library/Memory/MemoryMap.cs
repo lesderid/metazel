@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 
-namespace Metazel
+namespace Metazel.Library
 {
 	public class MemoryMap
 	{

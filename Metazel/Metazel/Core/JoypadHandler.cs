@@ -1,8 +1,9 @@
 using System.Diagnostics;
 using System.Linq;
+using Metazel.Library;
 using SharpDX.DirectInput;
 
-namespace Metazel
+namespace Metazel.NES
 {
 	public class JoypadHandler : IMemoryProvider
 	{

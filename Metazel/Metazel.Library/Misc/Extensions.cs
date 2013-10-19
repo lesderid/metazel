@@ -1,9 +1,9 @@
 ﻿using System.Diagnostics.Contracts;
 using System.Runtime.CompilerServices;
 
-namespace Metazel
+namespace Metazel.Library
 {
-	internal static class Extensions
+	public static class Extensions
 	{
 		private static readonly byte[] ReversedBitsLookupTable = new byte[]
 		                                                         {

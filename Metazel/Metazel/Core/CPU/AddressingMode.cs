@@ -1,4 +1,4 @@
-namespace Metazel
+namespace Metazel.NES
 {
 	internal enum AddressingMode
 	{

@@ -1,4 +1,6 @@
-﻿namespace Metazel
+﻿using Metazel.Library;
+
+namespace Metazel.NES
 {
 	public partial class NESEngine
 	{

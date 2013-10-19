@@ -1,7 +1,8 @@
 using System;
 using System.IO;
+using Metazel.Library;
 
-namespace Metazel
+namespace Metazel.NES
 {
 	public class NESCartridge
 	{

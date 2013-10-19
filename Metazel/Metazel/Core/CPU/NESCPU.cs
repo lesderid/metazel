@@ -4,8 +4,9 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading;
+using Metazel.Library;
 
-namespace Metazel
+namespace Metazel.NES
 {
 	public partial class NESCPU
 	{

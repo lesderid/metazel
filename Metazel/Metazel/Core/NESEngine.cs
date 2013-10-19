@@ -2,8 +2,9 @@
 using System.Diagnostics;
 using System.Drawing;
 using System.IO;
+using Metazel.Library;
 
-namespace Metazel
+namespace Metazel.NES
 {
 	public partial class NESEngine
 	{
@@ -34,8 +35,6 @@ namespace Metazel
 			//TODO: Add better mapper implementation (script-based?).
 
 			Cartridge = cartridge;
-
-			Debug.Assert(Cartridge.ROMMapper == ROMMapper.NROM);
 
 			CPU = new NESCPU(this);
 			PPU = new NESPPU(this);

@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Windows.Forms;
 
-namespace Metazel
+namespace Metazel.NES
 {
 	static class Program
 	{

@@ -1,6 +1,7 @@
 using System.Data;
+using Metazel.Library;
 
-namespace Metazel
+namespace Metazel.NES
 {
 	internal class OAMDMA : IMemoryProvider
 	{

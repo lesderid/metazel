@@ -2,11 +2,11 @@
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Imaging;
-using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
+using Metazel.Library;
 
-namespace Metazel
+namespace Metazel.NES
 {
 	public class NESPPU
 	{
@@ -185,7 +185,7 @@ namespace Metazel
 																 .SetBit(0, firstBit)
 																 .SetBit(1, secondBit)
 																 .SetBit(2, attributes.GetBit(0))
-																 .SetBit(3, attributes.GetBit(1))]];
+																 .SetBit(3, attributes.GetBit(1))] & 0x3F];
 
 						if (attributes.GetBit(5))
 							_spriteCacheBack[dot, scanLine] = color;
@@ -267,12 +267,11 @@ namespace Metazel
 			var paletteBit0 = attributePaletteByte.GetBit(startBit);
 			var paletteBit1 = attributePaletteByte.GetBit(startBit + 1);
 
-			var blah = Memory[0x3F00 + (firstBit || secondBit ? ((byte) 0)
-				                                                    .SetBit(0, firstBit)
-				                                                    .SetBit(1, secondBit)
-				                                                    .SetBit(2, paletteBit0)
-				                                                    .SetBit(3, paletteBit1) : 0)];
-			var color = _palette[blah & 0x3F];
+			var color = _palette[Memory[0x3F00 + (firstBit || secondBit ? ((byte) 0)
+																			  .SetBit(0, firstBit)
+																			  .SetBit(1, secondBit)
+																			  .SetBit(2, paletteBit0)
+																			  .SetBit(3, paletteBit1) : 0)]];
 
 			_frameBytes[i] = color.B; //B
 			_frameBytes[i + 1] = color.G; //G

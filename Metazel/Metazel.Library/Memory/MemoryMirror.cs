@@ -1,8 +1,8 @@
 using System;
 
-namespace Metazel
+namespace Metazel.Library
 {
-	internal class MemoryMirror : IMemoryProvider
+	public class MemoryMirror : IMemoryProvider
 	{
 		private readonly int _baseIndex;
 		private readonly MemoryMap _memoryMap;

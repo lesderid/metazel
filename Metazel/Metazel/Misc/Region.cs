@@ -1,4 +1,4 @@
-namespace Metazel
+namespace Metazel.NES
 {
 	public enum Region
 	{

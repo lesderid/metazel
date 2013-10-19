@@ -1,7 +1,8 @@
 using System;
 using System.Collections.Generic;
+using Metazel.Library;
 
-namespace Metazel
+namespace Metazel.NES
 {
 	internal class Instruction
 	{

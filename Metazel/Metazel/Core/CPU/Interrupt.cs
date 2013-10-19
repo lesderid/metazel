@@ -1,4 +1,4 @@
-namespace Metazel
+namespace Metazel.NES
 {
 	// ReSharper disable InconsistentNaming
 	public enum Interrupt : ushort

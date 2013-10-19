@@ -1,6 +1,7 @@
 ﻿using System;
+using Metazel.Library;
 
-namespace Metazel
+namespace Metazel.NES
 {
 	public partial class NESEngine 
 	{

@@ -1,8 +1,6 @@
-﻿using System;
-
-namespace Metazel
+﻿namespace Metazel.Library
 {
-	internal class IndexedByteArray : IMemoryProvider
+	public class IndexedByteArray : IMemoryProvider
 	{
 		private readonly int _baseAddress;
 		private readonly byte[] _underlyingArray;
