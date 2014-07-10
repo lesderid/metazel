@@ -1,6 +1,6 @@
 namespace Metazel.NES
 {
-	internal enum AddressingMode
+	public enum AddressingMode
 	{
 		Implicit,
 		Accumulator,

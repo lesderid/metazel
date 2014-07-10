@@ -8,11 +8,11 @@ namespace Metazel.NES
 	{
 		// ReSharper disable InconsistentNaming -> Ignore opcode names.
 
-		private Dictionary<byte, InstructionMetadata> _instructionData;
+		public Dictionary<byte, InstructionMetadata> InstructionMetadata;
 
 		private void InitialiseInstructionMetadata()
 		{
-			_instructionData = new Dictionary<byte, InstructionMetadata>
+			InstructionMetadata = new Dictionary<byte, InstructionMetadata>
 			{
 				{ 0x78, new InstructionMetadata("SEI", AddressingMode.Implicit, 0, 2, (data, bytes) => { I = true; }) },
 				{ 0x58, new InstructionMetadata("CLI", AddressingMode.Implicit, 0, 2, (data, bytes) => { I = false; }) },
@@ -327,7 +327,7 @@ namespace Metazel.NES
 
 			C = unsignedResult > byte.MaxValue;
 			V = ((value ^ unsignedResult) & (A ^ unsignedResult) & 0x80) != 0;
-			
+
 			A = (byte) unsignedResult;
 
 			Z = A == 0;
@@ -1121,7 +1121,7 @@ namespace Metazel.NES
 
 			C = unsignedResult > byte.MaxValue;
 			V = ((value ^ unsignedResult) & (A ^ unsignedResult) & 0x80) != 0;
-			
+
 			A = (byte) unsignedResult;
 
 			Z = A == 0;
@@ -1174,7 +1174,7 @@ namespace Metazel.NES
 					}
 			}
 
-			var unsignedResult = A + (byte)~value + (uint) (C ? 1 : 0);
+			var unsignedResult = A + (byte) ~value + (uint) (C ? 1 : 0);
 
 			C = unsignedResult > byte.MaxValue;
 			V = (((byte) ~value ^ unsignedResult) & (A ^ unsignedResult) & 0x80) != 0;
@@ -1665,7 +1665,7 @@ namespace Metazel.NES
 		}
 	}
 
-	internal class InstructionMetadata
+	public struct InstructionMetadata
 	{
 		public readonly Action<InstructionMetadata, byte[]> Action;
 		public readonly AddressingMode AddressingMode;
@@ -1680,6 +1680,20 @@ namespace Metazel.NES
 			OperandSize = operandSize;
 			CycleCount = cycleCount;
 			Action = action;
+		}
+
+		public static bool operator ==(InstructionMetadata a, InstructionMetadata b)
+		{
+			return a.Name == b.Name &&
+				a.AddressingMode == b.AddressingMode &&
+				a.CycleCount == b.CycleCount &&
+				a.OperandSize == b.OperandSize &&
+				a.Action == b.Action;
+		}
+
+		public static bool operator !=(InstructionMetadata a, InstructionMetadata b)
+		{
+			return !(a == b);
 		}
 	}
 }

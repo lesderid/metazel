@@ -229,15 +229,13 @@ namespace Metazel.NES
 			var x = _dot + _horizontalScroll;
 			var y = _scanLine + _verticalScroll;
 
-			var nextNameTableX = new Func<int, int>(address => (address - 0x2000 + 0x400) % 0x800 + 0x2000);
-			var nextNameTableY = new Func<int, int>(address => (address - 0x2000 + 0x800) % 0x1000 + 0x2000);
 			var nameTableAddress = Registers.NameTableAddress;
 
 			for (var j = 0; j < x / 256; j++)
-				nameTableAddress = nextNameTableX(nameTableAddress);
+				nameTableAddress = (nameTableAddress - 0x2000 + 0x400) % 0x800 + 0x2000;
 
 			for (var j = 0; j < y / 240; j++)
-				nameTableAddress = nextNameTableY(nameTableAddress);
+				nameTableAddress = (nameTableAddress - 0x2000 + 0x800) % 0x1000 + 0x2000;
 
 			x %= 256;
 			y %= 240;

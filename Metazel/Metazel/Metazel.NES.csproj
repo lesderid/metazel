@@ -7,8 +7,8 @@
     <ProjectGuid>{88842F7B-5F3F-4BC0-AB9A-266162C28DC5}</ProjectGuid>
     <OutputType>Exe</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>Metazel</RootNamespace>
-    <AssemblyName>Metazel</AssemblyName>
+    <RootNamespace>Metazel.NES</RootNamespace>
+    <AssemblyName>Metazel.NES</AssemblyName>
     <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <ProjectTypeGuids>{60dc8134-eba5-43b8-bcc9-bb4bc16c2548};{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}</ProjectTypeGuids>
@@ -17,6 +17,7 @@
     <SccLocalPath>.</SccLocalPath>
     <SccAuxPath>https://lesderid.visualstudio.com/defaultcollection</SccAuxPath>
     <SccProvider>{4CA58AB2-18FA-4F8D-95D4-32DDF27D184C}</SccProvider>
+    <TargetFrameworkProfile />
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <PlatformTarget>AnyCPU</PlatformTarget>
@@ -31,7 +32,7 @@
     <Prefer32Bit>false</Prefer32Bit>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
-    <PlatformTarget>AnyCPU</PlatformTarget>
+    <PlatformTarget>x64</PlatformTarget>
     <DebugType>pdbonly</DebugType>
     <Optimize>true</Optimize>
     <OutputPath>bin\Release\</OutputPath>
@@ -41,7 +42,7 @@
     <Prefer32Bit>false</Prefer32Bit>
   </PropertyGroup>
   <PropertyGroup>
-    <StartupObject>Metazel.Program</StartupObject>
+    <StartupObject>Metazel.NES.Program</StartupObject>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="PresentationCore" />
@@ -72,7 +73,11 @@
     <Compile Include="Core\CPU\NESCPU.cs" />
     <Compile Include="Core\JoypadHandler.cs" />
     <Compile Include="Core\CPU\OAMDMA.cs" />
+    <Compile Include="Core\Mappers\NROM\NROMMemoryMaps.cs" />
+    <Compile Include="Core\Mappers\SxROM\SxROMMapper.cs" />
+    <Compile Include="Core\Mappers\SxROM\SxROMMemoryMaps.cs" />
     <Compile Include="Core\PPU\NESPPU.cs" />
+    <Compile Include="Core\PPU\PPUPaletteData.cs" />
     <Compile Include="Core\PPU\PPURegisters.cs" />
     <Compile Include="MainForm.cs">
       <SubType>Form</SubType>
@@ -80,11 +85,6 @@
     <Compile Include="MainForm.Designer.cs">
       <DependentUpon>MainForm.cs</DependentUpon>
     </Compile>
-    <Compile Include="Memory\MemoryMirror.cs" />
-    <Compile Include="Memory\IndexedByteArray.cs" />
-    <Compile Include="Misc\Extensions.cs" />
-    <Compile Include="Memory\IMemoryProvider.cs" />
-    <Compile Include="Memory\MemoryMap.cs" />
     <Compile Include="Core\NESCartridge.cs" />
     <Compile Include="Core\NESEngine.cs" />
     <Compile Include="Misc\Region.cs" />
@@ -101,7 +101,15 @@
     </EmbeddedResource>
     <AppDesigner Include="Properties\" />
   </ItemGroup>
-  <ItemGroup />
+  <ItemGroup>
+    <None Include="App.config" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Metazel.Library\Metazel.Library.csproj">
+      <Project>{bcd1aca7-7c3c-4552-9cd4-284ee679cc08}</Project>
+      <Name>Metazel.Library</Name>
+    </ProjectReference>
+  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.

@@ -7,8 +7,8 @@ namespace Metazel.Library
 	public class MemoryMap
 	{
 		private readonly Type _byteArrayType;
-		private readonly List<MemoryMapEntry> _map = new List<MemoryMapEntry>();
 		private readonly Type _memoryProviderType;
+		private readonly List<MemoryMapEntry> _map = new List<MemoryMapEntry>();
 
 		private Tuple<int, Type, byte[], IMemoryProvider>[] _entryAddressTuples;
 		private bool _entryAddressTuplesDirty = true;

@@ -4,16 +4,27 @@ using Metazel.Library;
 
 namespace Metazel.NES
 {
-	internal class Instruction
+	internal struct Instruction
 	{
 		public int CyclesLeft;
 
 		public Instruction(InstructionMetadata metadata, byte[] operands)
+			: this()
 		{
 			Metadata = metadata;
 			Operands = operands;
 
 			CyclesLeft = metadata.CycleCount;
+		}
+
+		public static bool operator ==(Instruction a, Instruction b)
+		{
+			return a.Metadata == b.Metadata && a.Operands == b.Operands;
+		}
+
+		public static bool operator !=(Instruction a, Instruction b)
+		{
+			return !(a == b);
 		}
 
 		public InstructionMetadata Metadata { get; private set; }
@@ -92,8 +103,8 @@ namespace Metazel.NES
 							{
 								var address = BitConverter.ToUInt16(Operands, 0);
 								return new List<ushort> { 0x2000, 0x2001, 0x2003, 0x2005, 0x2006 }.Contains(address)
-									       ? string.Format("{0} ${1:X4} = *PPU Register*", Metadata.Name, address)
-									       : string.Format("{0} ${1:X4} = {2:X2}", Metadata.Name, address, cpu.Memory[address]);
+										   ? string.Format("{0} ${1:X4} = *PPU Register*", Metadata.Name, address)
+										   : string.Format("{0} ${1:X4} = {2:X2}", Metadata.Name, address, cpu.Memory[address]);
 							}
 						case AddressingMode.IndexedIndirect:
 							{
@@ -101,7 +112,7 @@ namespace Metazel.NES
 								var address =
 									BitConverter.ToUInt16(new[] { cpu.Memory[(byte) indexedValue], cpu.Memory[(byte) (indexedValue + 1)] }, 0);
 								return string.Format("{0} (${1:X2},X) @ {2:X2} = {3:X4} = {4:X2}", Metadata.Name, Operands[0],
-								                     (byte) indexedValue, address, cpu.Memory[address]);
+													 (byte) indexedValue, address, cpu.Memory[address]);
 							}
 						case AddressingMode.IndirectIndexed:
 							{
@@ -109,25 +120,25 @@ namespace Metazel.NES
 									new[] { cpu.Memory[Operands[0]], cpu.Memory[(byte) (Operands[0] + 1)] }, 0);
 								var address = (ushort) (baseIndirect + cpu.Y);
 								return string.Format("{0} (${1:X2}),Y = {2:X4} @ {3:X4} = {4:X2}", Metadata.Name, Operands[0], baseIndirect,
-								                     address, cpu.Memory[address]);
+													 address, cpu.Memory[address]);
 							}
 						case AddressingMode.AbsoluteY:
 							{
 								var address = BitConverter.ToUInt16(Operands, 0);
 								return string.Format("{0} ${1:X4},Y @ {2:X4} = {3:X2}", Metadata.Name, address, (ushort) (address + cpu.Y),
-								                     cpu.Memory[(ushort) (address + cpu.Y)]);
+													 cpu.Memory[(ushort) (address + cpu.Y)]);
 							}
 						case AddressingMode.ZeroPageX:
 							return string.Format("{0} ${1:X2},X @ {2:X2} = {3:X2}", Metadata.Name, Operands[0], (byte) (Operands[0] + cpu.X),
-							                     cpu.Memory[(byte) (Operands[0] + cpu.X)]);
+												 cpu.Memory[(byte) (Operands[0] + cpu.X)]);
 						case AddressingMode.ZeroPageY:
 							return string.Format("{0} ${1:X2},Y @ {2:X2} = {3:X2}", Metadata.Name, Operands[0], (byte) (Operands[0] + cpu.Y),
-							                     cpu.Memory[(byte) (Operands[0] + cpu.Y)]);
+												 cpu.Memory[(byte) (Operands[0] + cpu.Y)]);
 						case AddressingMode.AbsoluteX:
 							{
 								var address = BitConverter.ToUInt16(Operands, 0);
 								return string.Format("{0} ${1:X4},X @ {2:X4} = {3:X2}", Metadata.Name, address, (ushort) (address + cpu.X),
-								                     cpu.Memory[(ushort) (address + cpu.X)]);
+													 cpu.Memory[(ushort) (address + cpu.X)]);
 							}
 					}
 					goto default;

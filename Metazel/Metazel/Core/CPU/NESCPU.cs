@@ -23,7 +23,7 @@ namespace Metazel.NES
 			InitialiseInstructionMetadata();
 
 			var undocumentedOpcodes = Enumerable.Range(0, 255).ToList();
-			foreach (var pair in _instructionData)
+			foreach (var pair in InstructionMetadata)
 				undocumentedOpcodes.Remove(pair.Key);
 		}
 
@@ -102,15 +102,21 @@ namespace Metazel.NES
 		{
 			//TODO: Implement this correctly.
 
-			if (_currentInstruction == null || _currentInstruction.CyclesLeft == 0)
+			if (_currentInstruction == default(Instruction) || _currentInstruction.CyclesLeft == 0)
 			{
 				if (_interrupts.Count > 0)
 					_currentInstruction = DoInterrupt();
+				else if (_preParsed)
+				{
+					_currentInstruction = _preParsedInstructions[PC - 0x8000];
+
+					PC += (ushort)(_currentInstruction.Metadata.OperandSize + 1);
+				}
 				else
 				{
 					var opcode = Memory[PC];
 
-					var metadata = _instructionData[opcode];
+					var metadata = InstructionMetadata[opcode];
 					PC++;
 
 					var operands = new byte[metadata.OperandSize];
@@ -177,6 +183,39 @@ namespace Metazel.NES
 		public void TriggerInterrupt(Interrupt type)
 		{
 			_interrupts.Add(type);
+		}
+
+		private bool _preParsed;
+		private readonly Instruction[] _preParsedInstructions = new Instruction[0x8000];
+		public void PreParse()
+		{
+			if (_engine.Cartridge.ROMMapper != ROMMapper.NROM)
+				return;
+
+			for (var i = 0; i < 0x8000; i++)
+			{
+				var memoryI = i + 0x8000;
+
+				var opcode = Memory[memoryI];
+
+				if (!InstructionMetadata.ContainsKey(opcode)) continue;
+				var metadata = InstructionMetadata[opcode];
+				memoryI++;
+
+				if (metadata.OperandSize > 2) continue;
+				var operands = new byte[metadata.OperandSize];
+				for (var j = 0; j < metadata.OperandSize; j++)
+				{
+					if (memoryI + j > 0xFFFF)
+						continue;
+
+					operands[j] = Memory[memoryI + j];
+				}
+				
+				_preParsedInstructions[i] = new Instruction(metadata, operands);
+			}
+
+			_preParsed = true;
 		}
 	}
 }
