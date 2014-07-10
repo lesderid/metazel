@@ -74,7 +74,7 @@ namespace Metazel.NES
 				Registers.VBlank = true;
 
 				if (Registers.VBlankNMI)
-					_engine.CPU.TriggerInterrupt(Interrupt.NMI);
+					_engine.CPU.TriggerInterrupt(new Interrupt(InterruptType.NMI));
 			}
 			else if (_scanLine == -1 && _dot == 1)
 				Registers.VBlank = Registers.Sprite0Hit = Registers.SpriteOverflow = false;

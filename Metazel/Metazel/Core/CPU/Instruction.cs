@@ -4,7 +4,7 @@ using Metazel.Library;
 
 namespace Metazel.NES
 {
-	internal struct Instruction
+    public struct Instruction
 	{
 		public int CyclesLeft;
 

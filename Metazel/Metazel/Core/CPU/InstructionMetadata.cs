@@ -46,6 +46,7 @@ namespace Metazel.NES
 				{ 0x20, new InstructionMetadata("JSR", AddressingMode.Absolute, 2, 6, JSR) },
 				{ 0x60, new InstructionMetadata("RTS", AddressingMode.Implicit, 0, 6, RTS) },
 				{ 0x40, new InstructionMetadata("RTI", AddressingMode.Implicit, 0, 6, RTI) },
+                { 0x00, new InstructionMetadata("BRK", AddressingMode.Implicit, 1, 1, BRK) }, //Note: Actually 7 cycles, other 6 cycles are in interrupt instruction.
 
 				{ 0x85, new InstructionMetadata("STA", AddressingMode.ZeroPage, 1, 3, STA) },
 				{ 0x8D, new InstructionMetadata("STA", AddressingMode.Absolute, 2, 4, STA) },
@@ -269,7 +270,12 @@ namespace Metazel.NES
 			};
 		}
 
-		private void RRA(InstructionMetadata metadata, byte[] operands)
+        private void BRK(InstructionMetadata metadata, byte[] operands)
+	    {
+	        TriggerInterrupt(new Interrupt(InterruptType.BRK));
+	    }
+
+	    private void RRA(InstructionMetadata metadata, byte[] operands)
 		{
 			var oldCarry = C;
 
