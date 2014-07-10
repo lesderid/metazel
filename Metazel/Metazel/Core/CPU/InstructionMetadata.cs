@@ -313,15 +313,15 @@ namespace Metazel.NES
 					break;
 			}
 
-			Memory[address] >>= 1;
+            C = Memory[address].GetBit(0);
+			
+            Memory[address] >>= 1;
 			Memory[address] = Memory[address].SetBit(7, oldCarry);
 
 			Z = Memory[address] == 0;
 			N = Memory[address].GetBit(7);
 
 			var value = Memory[address];
-
-			//TODO: Fix addition part.
 
 			var unsignedResult = A + (uint) value + (uint) (C ? 1 : 0);
 
@@ -332,7 +332,7 @@ namespace Metazel.NES
 
 			Z = A == 0;
 			N = A.GetBit(7);
-		}
+        }
 
 		private void SRE(InstructionMetadata metadata, byte[] operands)
 		{

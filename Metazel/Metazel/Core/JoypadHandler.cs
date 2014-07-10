@@ -1,81 +1,63 @@
 using System.Diagnostics;
-using System.Linq;
 using Metazel.Library;
-using SharpDX.DirectInput;
+using SharpDX.XInput;
 
 namespace Metazel.NES
 {
-	public class JoypadHandler : IMemoryProvider
-	{
-		//TODO: Add configuration options.
+    public class JoypadHandler : IMemoryProvider
+    {
+        //TODO: Add configuration options.
 
-		private int _readNumber;
-		private byte _previousWrite = byte.MaxValue;
-		private readonly Joystick _joypad;
-		private JoystickState _state;
+        private int _readNumber;
+        private byte _previousWrite = byte.MaxValue;
+        private readonly Controller _controller;
+        private State _controllerState;
 
-		public JoypadHandler(int index)
-		{
-			var directInput = new DirectInput();
+        public JoypadHandler(int index)
+        {
+            _controller = new Controller((UserIndex)(index - 1));
+        }
 
-			var device = directInput.GetDevices(DeviceType.Joystick, DeviceEnumerationFlags.AllDevices).Skip(index - 1).FirstOrDefault();
+        public byte this[int address]
+        {
+            get
+            {
+                _readNumber++;
 
-			if (device == null)
-				return;
+                switch (_readNumber)
+                {
+                    case 1: //A
+                        return (byte)(_controllerState.Gamepad.Buttons.HasFlag(GamepadButtonFlags.A) ? 1 : 0);
+                    case 2: //B
+                        return (byte)(_controllerState.Gamepad.Buttons.HasFlag(GamepadButtonFlags.B) ? 1 : 0);
+                    case 3: //Select
+                        return (byte)(_controllerState.Gamepad.Buttons.HasFlag(GamepadButtonFlags.Back) ? 1 : 0);
+                    case 4: //Start
+                        return (byte)(_controllerState.Gamepad.Buttons.HasFlag(GamepadButtonFlags.Start) ? 1 : 0);
+                    case 5: //Up
+                        return (byte)(_controllerState.Gamepad.Buttons.HasFlag(GamepadButtonFlags.DPadUp) ? 1 : 0);
+                    case 6: //Down
+                        return (byte)(_controllerState.Gamepad.Buttons.HasFlag(GamepadButtonFlags.DPadDown) ? 1 : 0);
+                    case 7: //Left
+                        return (byte)(_controllerState.Gamepad.Buttons.HasFlag(GamepadButtonFlags.DPadLeft) ? 1 : 0);
+                    case 8: //Right
+                        return (byte)(_controllerState.Gamepad.Buttons.HasFlag(GamepadButtonFlags.DPadRight) ? 1 : 0);
+                    default:
+                        Debugger.Break();
+                        return 1;
+                }
+            }
+            set
+            {
+                if (_controller == null || !_controller.IsConnected)
+                    return;
 
-			var guid = device.InstanceGuid;
+                _controllerState = _controller.GetState();
 
-			_joypad = new Joystick(directInput, guid);
-			_joypad.Properties.BufferSize = 128;
-			_joypad.Acquire();
-		}
+                _readNumber = 0;
 
-		public byte this[int address]
-		{
-			get
-			{
-				_readNumber++;
-
-				if (_state == null)
-					return 0;
-
-				switch (_readNumber)
-				{
-					case 1:
-						return (byte) (_state.Buttons[0] ? 1 : 0);
-					case 2:
-						return (byte) (_state.Buttons[1] ? 1 : 0);
-					case 3:
-						return (byte) (_state.Buttons[8] ? 1 : 0);
-					case 4:
-						return (byte) (_state.Buttons[9] ? 1 : 0);
-					case 5:
-						return (byte) (_state.Y == 256 ? 1 : 0);
-					case 6:
-						return (byte) (_state.Y == 65535 ? 1 : 0);
-					case 7:
-						return (byte) (_state.X == 256 ? 1 : 0);
-					case 8:
-						return (byte) (_state.X == 65535 ? 1 : 0);
-					default:
-						return 1;
-				}
-			}
-			set
-			{
-				if (_joypad == null)
-					return;
-
-				_joypad.Poll();
-
-				_state = _joypad.GetCurrentState();
-				_readNumber = 0;
-
-				if (_state == null)
-					Debugger.Break();
-
-				_previousWrite = value;
-			}
-		}
-	}
+                _previousWrite = value;
+            }
+        }
+    }
 }

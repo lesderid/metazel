@@ -185,12 +185,28 @@ namespace Metazel.NES
 			_interrupts.Add(type);
 		}
 
+	    public string GetStateInformation()
+	    {
+            var scanLine = (241 + (TotalCycleCount * 3 - TotalCycleCount * 3 % 341) / 341) % 261;
+            if (scanLine < 241)
+                scanLine--;
+
+            //Note: TotalCycleCount is inaccurate during instruction execution!
+            return string.Format("A:{0:X2} X:{1:X2} Y:{2:X2} P:{3:X2} SP:{4:X2} CYC:{5,3} SL:{6}", A, X, Y, P, S, TotalCycleCount * 3 % 341, scanLine);
+	    }
+
 		private bool _preParsed;
 		private readonly Instruction[] _preParsedInstructions = new Instruction[0x8000];
 		public void PreParse()
 		{
-			if (_engine.Cartridge.ROMMapper != ROMMapper.NROM)
-				return;
+		    if (_engine.Cartridge.ROMMapper != ROMMapper.NROM)
+		    {
+                Console.WriteLine("PreParse(): Can't pre-parse because cartridge isn't NROM!");
+
+		        return;
+		    }
+
+            Console.WriteLine("PreParse(): Starting");
 
 			for (var i = 0; i < 0x8000; i++)
 			{
@@ -216,6 +232,8 @@ namespace Metazel.NES
 			}
 
 			_preParsed = true;
-		}
+
+            Console.WriteLine("PreParse(): Done");
+        }
 	}
 }

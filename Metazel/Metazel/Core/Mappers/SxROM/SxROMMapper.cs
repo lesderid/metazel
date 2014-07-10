@@ -41,28 +41,28 @@ namespace Metazel.NES
 				switch (Mirroring)
 				{
 					case 0:
-						NameTable00Mapper._nameTable = _engine.NameTableA;
-						NameTable01Mapper._nameTable = _engine.NameTableA;
-						NameTable10Mapper._nameTable = _engine.NameTableA;
-						NameTable11Mapper._nameTable = _engine.NameTableA;
+						NameTable00Mapper.NameTable = _engine.NameTableA;
+						NameTable01Mapper.NameTable = _engine.NameTableA;
+						NameTable10Mapper.NameTable = _engine.NameTableA;
+						NameTable11Mapper.NameTable = _engine.NameTableA;
 						break;
 					case 1:
-						NameTable00Mapper._nameTable = _engine.NameTableB;
-						NameTable01Mapper._nameTable = _engine.NameTableB;
-						NameTable10Mapper._nameTable = _engine.NameTableB;
-						NameTable11Mapper._nameTable = _engine.NameTableB;
+						NameTable00Mapper.NameTable = _engine.NameTableB;
+						NameTable01Mapper.NameTable = _engine.NameTableB;
+						NameTable10Mapper.NameTable = _engine.NameTableB;
+						NameTable11Mapper.NameTable = _engine.NameTableB;
 						break;
 					case 2:
-						NameTable00Mapper._nameTable = _engine.NameTableA;
-						NameTable01Mapper._nameTable = _engine.NameTableB;
-						NameTable10Mapper._nameTable = _engine.NameTableA;
-						NameTable11Mapper._nameTable = _engine.NameTableB;
+						NameTable00Mapper.NameTable = _engine.NameTableA;
+						NameTable01Mapper.NameTable = _engine.NameTableB;
+						NameTable10Mapper.NameTable = _engine.NameTableA;
+						NameTable11Mapper.NameTable = _engine.NameTableB;
 						break;
 					case 3:
-						NameTable00Mapper._nameTable = _engine.NameTableA;
-						NameTable01Mapper._nameTable = _engine.NameTableA;
-						NameTable10Mapper._nameTable = _engine.NameTableB;
-						NameTable11Mapper._nameTable = _engine.NameTableB;
+						NameTable00Mapper.NameTable = _engine.NameTableA;
+						NameTable01Mapper.NameTable = _engine.NameTableA;
+						NameTable10Mapper.NameTable = _engine.NameTableB;
+						NameTable11Mapper.NameTable = _engine.NameTableB;
 						break;
 				}
 			}
@@ -75,16 +75,16 @@ namespace Metazel.NES
 
 			CHRBank0Mapper = new SxROMCHRMapper(this, false);
 			CHRBank1Mapper = new SxROMCHRMapper(this, true);
-			NameTable00Mapper = new SxROMNameTableMapper(this);
-			NameTable01Mapper = new SxROMNameTableMapper(this);
-			NameTable10Mapper = new SxROMNameTableMapper(this);
-			NameTable11Mapper = new SxROMNameTableMapper(this);
+			NameTable00Mapper = new SxROMNameTableMapper();
+			NameTable01Mapper = new SxROMNameTableMapper();
+			NameTable10Mapper = new SxROMNameTableMapper();
+			NameTable11Mapper = new SxROMNameTableMapper();
 			PRGBank0Mapper = new SxROMPRGMapper(this, false);
 			PRGBank1Mapper = new SxROMPRGMapper(this, true);
 			RAMMapper = new SxROMRAMMapper(this);
 
 			ControlRegister = 0xC;
-			PRGBank1Mapper._bank = _engine.Cartridge.ROMBanks.Length - 1;
+			PRGBank1Mapper.Bank = _engine.Cartridge.ROMBanks.Length - 1;
 		}
 
 		public byte Mirroring
@@ -107,7 +107,7 @@ namespace Metazel.NES
 			private readonly bool _isBank1;
 			private readonly SxROMMapper _mapper;
 
-			public int _bank;
+			public int Bank;
 
 			public SxROMCHRMapper(SxROMMapper mapper, bool isBank1)
 			{
@@ -123,15 +123,15 @@ namespace Metazel.NES
 				get
 				{
 					return _isBank1 && _mapper.CHRROMBankMode == 0
-							   ? _mapper._engine.Cartridge.VROMBanks[_mapper.CHRBank0Mapper._bank][address + 0x1000]
-							   : _mapper._engine.Cartridge.VROMBanks[_bank][address];
+							   ? _mapper._engine.Cartridge.VROMBanks[_mapper.CHRBank0Mapper.Bank][address + 0x1000]
+							   : _mapper._engine.Cartridge.VROMBanks[Bank][address];
 				}
 				set
 				{
 					if (_isBank1 && _mapper.CHRROMBankMode == 0)
-						_mapper._engine.Cartridge.VROMBanks[_mapper.CHRBank0Mapper._bank][address + 0x1000] = value;
+						_mapper._engine.Cartridge.VROMBanks[_mapper.CHRBank0Mapper.Bank][address + 0x1000] = value;
 					else
-						_mapper._engine.Cartridge.VROMBanks[_bank][address] = value;
+						_mapper._engine.Cartridge.VROMBanks[Bank][address] = value;
 				}
 			}
 
@@ -144,21 +144,14 @@ namespace Metazel.NES
 
 		public class SxROMNameTableMapper : IMemoryProvider
 		{
-			private readonly SxROMMapper _mapper;
+		    public byte[] NameTable;
 
-			public byte[] _nameTable;
-
-			public SxROMNameTableMapper(SxROMMapper mapper)
-			{
-				_mapper = mapper;
-			}
-
-			#region IMemoryProvider Members
+		    #region IMemoryProvider Members
 
 			public byte this[int address]
 			{
-				get { return _nameTable[address]; }
-				set { _nameTable[address] = value; }
+				get { return NameTable[address]; }
+				set { NameTable[address] = value; }
 			}
 
 			#endregion
@@ -171,7 +164,7 @@ namespace Metazel.NES
 		public class SxROMPRGMapper : IMemoryProvider
 		{
 			private readonly SxROMMapper _mapper;
-			public int _bank;
+			public int Bank;
 
 			private byte _shiftRegister = 0x10;
 			private int _writeNumber;
@@ -192,8 +185,8 @@ namespace Metazel.NES
 				get
 				{
 					return _isBank1 && _mapper.PRGROMBankMode < 2
-							   ? _mapper._engine.Cartridge.ROMBanks[_mapper.CHRBank0Mapper._bank + 1][address]
-							   : _mapper._engine.Cartridge.ROMBanks[_bank][address];
+							   ? _mapper._engine.Cartridge.ROMBanks[_mapper.CHRBank0Mapper.Bank + 1][address]
+							   : _mapper._engine.Cartridge.ROMBanks[Bank][address];
 				}
 				set
 				{
@@ -222,14 +215,14 @@ namespace Metazel.NES
 								if (address >= 0 && address < 0x2000)
 									_mapper.ControlRegister = registerValue;
 								else if (address >= 0x2000 && address < 0x4000)
-									_mapper.CHRBank0Mapper._bank = _mapper.CHRROMBankMode == 0 ? value >> 1 : value;
+									_mapper.CHRBank0Mapper.Bank = _mapper.CHRROMBankMode == 0 ? value >> 1 : value;
 							}
 							else
 							{
 								if (address >= 0 && address < 0x2000)
 								{
 									if (_mapper.CHRROMBankMode != 0)
-										_mapper.CHRBank1Mapper._bank = value;
+										_mapper.CHRBank1Mapper.Bank = value;
 								}
 								else if (address >= 0x2000 && address < 0x4000)
 								{
@@ -237,13 +230,13 @@ namespace Metazel.NES
 									{
 										case 0:
 										case 1:
-											_bank = (registerValue & 0xF) * 2;
+											Bank = (registerValue & 0xF) * 2;
 											break;
 										case 2:
-											_mapper.PRGBank1Mapper._bank = registerValue & 0xF;
+											_mapper.PRGBank1Mapper.Bank = registerValue & 0xF;
 											break;
 										case 3:
-											_mapper.PRGBank0Mapper._bank = registerValue & 0xF;
+											_mapper.PRGBank0Mapper.Bank = registerValue & 0xF;
 											break;
 									}
 
