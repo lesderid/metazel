@@ -37,7 +37,7 @@ namespace Metazel.NES
                     SetI = true;
                     break;
                 case InterruptType.IRQ:
-                    CycleCount = 0; //Todo: Make IRQ not use a cycle.
+                    CycleCount = 0; //TODO: Make IRQ not use a cycle.
                     Vector = 0xFFFE;
                     PushCPUState = true;
                     SetB = false;
