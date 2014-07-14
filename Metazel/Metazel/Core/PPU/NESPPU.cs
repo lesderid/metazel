@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.Runtime.InteropServices;
@@ -28,7 +29,10 @@ namespace Metazel.NES
 		private Color?[,] _spriteCacheBack;
 		private Color?[,] _spriteCacheFront;
 
-		public NESPPU(NESEngine engine)
+        public bool RenderingEnabled { get { return Registers.BackgroundVisible && Registers.SpritesVisible; } }
+	    public bool ClippingEnabled { get { return !Registers.DisableBackgroundClipping && !Registers.DisableSpriteClipping; } }
+
+	    public NESPPU(NESEngine engine)
 		{
 			_engine = engine;
 
@@ -76,8 +80,6 @@ namespace Metazel.NES
 				if (Registers.VBlankNMI)
 					_engine.CPU.TriggerInterrupt(new Interrupt(InterruptType.NMI));
 			}
-			else if (_scanLine == -1 && _dot == 1)
-				Registers.VBlank = Registers.Sprite0Hit = Registers.SpriteOverflow = false;
 			else if (_scanLine == -1 && _dot == 340)
 			{
 				_frameBytes = new byte[256 * 240 * 3];
@@ -102,13 +104,13 @@ namespace Metazel.NES
 					_verticalScroll = Registers.VerticalScroll;
 				}
 
-				if (Registers.SpritesVisible)
+                if (Registers.SpritesVisible)
 					DrawSpritesBack(i);
 
-				if (Registers.BackgroundVisible)
+                if (Registers.BackgroundVisible)
 					DrawBackground(i);
 
-				if (Registers.SpritesVisible)
+                if (Registers.SpritesVisible)
 					DrawSpritesFront(i);
 
 				if (_dot >= 257 && _dot <= 320)
@@ -119,13 +121,16 @@ namespace Metazel.NES
 				_dot++;
 			else
 			{
-				if (_scanLine == 260)
-					_scanLine = -1;
-				else
-					_scanLine++;
+			    if (_scanLine == 260)
+			        _scanLine = -1;
+			    else
+			        _scanLine++;
 
-				_dot = 0;
+			    _dot = 0;
 			}
+
+            if(_scanLine == 260 && _dot == 318) //HACK: Should happen on scanLine -1, dot 0 or 1 of next frame ...
+                Registers.VBlank = Registers.Sprite0Hit = Registers.SpriteOverflow = false;
 		}
 
 		private List<Tuple<int, int>> _sprite0Coordinates;
@@ -135,17 +140,14 @@ namespace Metazel.NES
 
 		private void CacheSprites()
 		{
-			Parallel.For(0, 64, attributeJ =>
+			Parallel.For(0, 64, attributeI =>
 			{
-				var j = attributeJ * 4;
+				var i = attributeI * 4;
 
-				var y = OAMData[j] + 1;
-				var tileIndex = OAMData[j + 1];
-				var attributes = OAMData[j + 2];
-				var x = OAMData[j + 3];
-
-				if (y >= 0xEF || x >= 0xF9)
-					return;
+			    var y = OAMData[i] + 1;
+				var tileIndex = OAMData[i + 1];
+				var attributes = OAMData[i + 2];
+				var x = OAMData[i + 3];
 
 				for (var dot = x; dot < x + 8 && dot >= x; dot++)
 				{
@@ -159,7 +161,7 @@ namespace Metazel.NES
 
 						int patternTableAddress;
 						if (Registers.LargeSprites)
-							continue;
+							throw new NotImplementedException("Large sprites not implemented yet!");
 						else
 							patternTableAddress = Registers.SpritePatternTableAddress;
 
@@ -178,8 +180,8 @@ namespace Metazel.NES
 						var firstBit = byte1.GetBit(7 - tileX);
 						var secondBit = byte2.GetBit(7 - tileX);
 
-						if (!(firstBit || secondBit))
-							continue;
+                        if (!(firstBit || secondBit))
+                            continue;
 
 						var color = _palette[Memory[0x3F10 + ((byte) 0)
 																 .SetBit(0, firstBit)
@@ -192,7 +194,7 @@ namespace Metazel.NES
 						else
 							_spriteCacheFront[dot, scanLine] = color;
 
-						if (j == 0)
+						if (i == 0)
 							_sprite0Coordinates.Add(new Tuple<int, int>(dot, scanLine));
 					}
 
@@ -204,7 +206,7 @@ namespace Metazel.NES
 		{
 			var color = _spriteCacheBack[_dot, _scanLine];
 
-			if (color == null)
+            if (color == null || (!Registers.DisableSpriteClipping && _dot < 8))
 				return;
 
 			_frameBytes[i] = ((Color) color).B; //B
@@ -216,7 +218,7 @@ namespace Metazel.NES
 		{
 			var color = _spriteCacheFront[_dot, _scanLine];
 
-			if (color == null)
+			if (color == null || (!Registers.DisableSpriteClipping && _dot < 8))
 				return;
 
 			_frameBytes[i] = ((Color) color).B; //B
@@ -265,22 +267,28 @@ namespace Metazel.NES
 			var paletteBit0 = attributePaletteByte.GetBit(startBit);
 			var paletteBit1 = attributePaletteByte.GetBit(startBit + 1);
 
-			var color = _palette[Memory[0x3F00 + (firstBit || secondBit ? ((byte) 0)
-																			  .SetBit(0, firstBit)
-																			  .SetBit(1, secondBit)
-																			  .SetBit(2, paletteBit0)
-																			  .SetBit(3, paletteBit1) : 0)]];
+		    if (_dot >= 8 || (_dot < 8 && Registers.DisableBackgroundClipping))
+		    {
+                var color = _palette[Memory[0x3F00 + (firstBit || secondBit ? ((byte)0)
+                                                                  .SetBit(0, firstBit)
+                                                                  .SetBit(1, secondBit)
+                                                                  .SetBit(2, paletteBit0)
+                                                                  .SetBit(3, paletteBit1) : 0)]];
 
-			_frameBytes[i] = color.B; //B
-			_frameBytes[i + 1] = color.G; //G
-			_frameBytes[i + 2] = color.R; //R
+                _frameBytes[i] = color.B; //B
+                _frameBytes[i + 1] = color.G; //G
+                _frameBytes[i + 2] = color.R; //R
+		    }
 
-			if (_sprite0Coordinates != null && (firstBit || secondBit))
+            if (RenderingEnabled && _sprite0Coordinates != null && (firstBit || secondBit))
 			{
 				for (var j = 0; j < _sprite0Coordinates.Count; j++)
 				{
-					if (_sprite0Coordinates[j].Item1 == _dot && _sprite0Coordinates[j].Item2 == _scanLine)
+					if (_sprite0Coordinates[j].Item1 == _dot && _sprite0Coordinates[j].Item2 == _scanLine && _scanLine != 239)
 					{
+                        if ((ClippingEnabled && _dot < 8) || _dot == 255 || _scanLine >= 239)
+                            continue;
+
 						Registers.Sprite0Hit = true;
 
 						_sprite0Coordinates = null;

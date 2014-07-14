@@ -11,7 +11,7 @@ namespace Metazel.NES
     public partial class NESCPU
     {
         private readonly NESEngine _engine;
-        public readonly StringBuilder _stringBuilder = new StringBuilder();
+        public readonly StringBuilder StringBuilder = new StringBuilder();
         private Instruction _currentInstruction;
 
         public NESCPU(NESEngine engine)

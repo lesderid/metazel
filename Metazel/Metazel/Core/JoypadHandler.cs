@@ -43,7 +43,6 @@ namespace Metazel.NES
                     case 8: //Right
                         return (byte)(_controllerState.Gamepad.Buttons.HasFlag(GamepadButtonFlags.DPadRight) ? 1 : 0);
                     default:
-                        Debugger.Break();
                         return 1;
                 }
             }

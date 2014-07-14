@@ -65,15 +65,15 @@ namespace Metazel.NES
 			get { return _ppuCtrl.GetBit(7); }
 		}
 
-		public bool Monochrome
+		public bool Monochrome //TODO: Implement monochrome rendering.
 		{
 			get { return _ppuMask.GetBit(0); }
 		}
-		public bool BackgroundClipping
+		public bool DisableBackgroundClipping
 		{
 			get { return _ppuMask.GetBit(1); }
 		}
-		public bool SpriteClipping
+		public bool DisableSpriteClipping
 		{
 			get { return _ppuMask.GetBit(2); }
 		}
@@ -85,15 +85,15 @@ namespace Metazel.NES
 		{
 			get { return _ppuMask.GetBit(4); }
 		}
-		public bool RedIntensified
+		public bool RedEmphasis
 		{
 			get { return _ppuMask.GetBit(5); }
 		}
-		public bool BlueIntensified
+		public bool BlueEmphasis
 		{
 			get { return _ppuMask.GetBit(6); }
 		}
-		public bool GreenIntensified
+		public bool GreenEmphasis
 		{
 			get { return _ppuMask.GetBit(7); }
 		}
@@ -133,9 +133,9 @@ namespace Metazel.NES
 				switch (address)
 				{
 					case 2:
-						_writeLatch = false;
+				        _writeLatch = false;
 
-						var status = _ppuStatus;
+				        var status = _ppuStatus;
 						VBlank = false;
 						return status;
 					case 4:
@@ -159,7 +159,7 @@ namespace Metazel.NES
 					default:
 						Console.WriteLine("Reading {0:X4} (?) ...", 0x2000 + address);
 
-						File.WriteAllText(_engine.Cartridge.Name + ".log", _engine.CPU._stringBuilder.ToString());
+						File.WriteAllText(_engine.Cartridge.Name + ".log", _engine.CPU.StringBuilder.ToString());
 
 						Environment.Exit(0);
 						break;
@@ -193,15 +193,12 @@ namespace Metazel.NES
 						_writeLatch = !_writeLatch;
 						break;
 					case 6:
-						if (_writeLatch)
-						{
-							_ppuAddressBuffer |= value;
-							_ppuAddress = _ppuAddressBuffer;
-						}
-						else
-							_ppuAddressBuffer = (ushort) (value << 8);
+				        if (_writeLatch)
+				            _ppuAddress = (ushort) (_ppuAddressBuffer | value);
+				        else
+				            _ppuAddressBuffer = (ushort) ((value & 0x7F) << 8);
 
-						_writeLatch = !_writeLatch;
+				        _writeLatch = !_writeLatch;
 						break;
 					case 7:
 						_ppu.Memory[_ppuAddress] = value;
@@ -210,7 +207,7 @@ namespace Metazel.NES
 					default:
 						Console.WriteLine("Writing {0:X4} (?) ...", 0x2000 + address);
 
-						File.WriteAllText(_engine.Cartridge.Name + ".log", _engine.CPU._stringBuilder.ToString());
+						File.WriteAllText(_engine.Cartridge.Name + ".log", _engine.CPU.StringBuilder.ToString());
 
 						Environment.Exit(0);
 						break;

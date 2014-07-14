@@ -87,6 +87,8 @@ namespace Metazel.NES
 				case ROMMapper.SxROM:
 					InitialiseSxROMCPUMemoryMap();
 					break;
+                default:
+			        throw new NotImplementedException(string.Format("Mapper {0} not implemented!", Cartridge.ROMMapper));
 			}
 
 			CPUMemoryMap.PopulateTuplesList();
