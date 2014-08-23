@@ -108,16 +108,14 @@ namespace Metazel.NES
 
 			while (true)
 			{
+                PPU.DoCycle();
+
 				switch (i)
 				{
 					case 1:
-						PPU.DoCycle();
-
 						i = 2;
 						break;
 					case 2:
-						PPU.DoCycle();
-
 						CPU.DoCycle();
 
 						var ticks = Environment.TickCount - previousTicks;
@@ -132,8 +130,6 @@ namespace Metazel.NES
 						i = 3;
 						break;
 					case 3:
-						PPU.DoCycle();
-
 						i = 1;
 						break;
 				}

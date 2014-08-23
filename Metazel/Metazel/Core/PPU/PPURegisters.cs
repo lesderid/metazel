@@ -205,11 +205,7 @@ namespace Metazel.NES
 						_ppuAddress += (ushort) AddressIncrementAmount;
 						break;
 					default:
-						Console.WriteLine("Writing {0:X4} (?) ...", 0x2000 + address);
-
-						File.WriteAllText(_engine.Cartridge.Name + ".log", _engine.CPU.StringBuilder.ToString());
-
-						Environment.Exit(0);
+						Console.WriteLine("Trying to write to read-only register ({0:X4}), ignoring ...", 0x2000 + address);
 						break;
 				}
 			}
