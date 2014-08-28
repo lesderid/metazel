@@ -8,6 +8,8 @@ namespace Metazel.NES
 {
 	public partial class NESEngine
 	{
+        public bool Running { get; private set; }
+
 		public readonly MemoryMap CPUMemoryMap = new MemoryMap();
 		public readonly MemoryMap PPUMemoryMap = new MemoryMap();
 
@@ -28,7 +30,7 @@ namespace Metazel.NES
 		public readonly JoypadHandler Joypad2 = new JoypadHandler(2);
 		private OAMDMA _oamDMA;
 
-		private int _frames = 0;
+		private int _frames;
 
 		public void Load(NESCartridge cartridge)
 		{
@@ -96,51 +98,57 @@ namespace Metazel.NES
 
 		public void Run()
 		{
+            Running = true;
+
+		    var firstTickCountWrite = true; //HACK: Suppresses buggy tick display after pause and resume.
+
 			var path = Cartridge.Name + ".log";
 			if (File.Exists(path))
 				File.Delete(path);
 
-			CPU.Initialize();
-
-			var i = 1;
+            if(!CPU.Initialised)
+			    CPU.Initialise();
 
 			var previousTicks = Environment.TickCount;
 
-			while (true)
+            while (Running)
 			{
                 PPU.DoCycle();
+                PPU.DoCycle();
+                PPU.DoCycle();
 
-				switch (i)
-				{
-					case 1:
-						i = 2;
-						break;
-					case 2:
-						CPU.DoCycle();
+                CPU.DoCycle();
 
-						var ticks = Environment.TickCount - previousTicks;
-						if (CPU.TotalCycleCount % 1789772 == 0)
-						{
-							Console.WriteLine("{0} ({1})", ticks, _frames / (ticks / 1000f));
+                if (CPU.TotalCycleCount % 1789772 == 0)
+                {
+                    var ticks = Environment.TickCount - previousTicks;
 
-							previousTicks = Environment.TickCount;
-							_frames = 0;
-						}
+                    if (!firstTickCountWrite)
+                        Console.WriteLine("{0} ({1})", ticks, _frames / (ticks / 1000f));
+                    else
+                        firstTickCountWrite = false;
 
-						i = 3;
-						break;
-					case 3:
-						i = 1;
-						break;
-				}
+                    previousTicks = Environment.TickCount;
+                    _frames = 0;
+                }
 			}
 		}
 
-		public void SetNewFrame(Bitmap frame)
+	    public void Stop()
+	    {
+            Running = false;
+	    }
+
+	    public void SetNewFrame(Bitmap frame)
 		{
 			NewFrame(frame);
 		}
 
 		public event Action<Bitmap> NewFrame;
+
+	    public void Reset()
+	    {
+	        throw new NotImplementedException();
+	    }
 	}
 }

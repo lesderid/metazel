@@ -23,11 +23,11 @@ namespace Metazel.NES
             InitialiseInstructionMetadata();
 
             var undocumentedOpcodes = Enumerable.Range(0, 255).ToList();
-            foreach (var pair in InstructionMetadata)
+            foreach (var pair in _instructionMetadataDictionary)
                 undocumentedOpcodes.Remove(pair.Key);
         }
 
-        public void Initialize()
+        public void Initialise()
         {
             //TODO: Properly implement RESET interrupt.											  
 
@@ -50,6 +50,8 @@ namespace Metazel.NES
 
             Memory[0x4015] = 0x00;
             Memory[0x4017] = 0x00;
+
+            Initialised = true;
         }
 
         public MemoryMap Memory
@@ -97,6 +99,7 @@ namespace Metazel.NES
         }
 
         public int TotalCycleCount { get; private set; }
+        public bool Initialised { get; private set; }
 
         public void DoCycle()
         {
@@ -116,7 +119,7 @@ namespace Metazel.NES
                 {
                     var opcode = Memory[PC];
 
-                    var metadata = InstructionMetadata[opcode];
+                    var metadata = _instructionMetadataArray[opcode];
                     PC++;
 
                     var operands = new byte[metadata.OperandSize];
@@ -196,8 +199,8 @@ namespace Metazel.NES
 
                 var opcode = Memory[memoryI];
 
-                if (!InstructionMetadata.ContainsKey(opcode)) continue;
-                var metadata = InstructionMetadata[opcode];
+                if (!_instructionMetadataDictionary.ContainsKey(opcode)) continue;
+                var metadata = _instructionMetadataDictionary[opcode];
                 memoryI++;
 
                 if (metadata.OperandSize > 2) continue;

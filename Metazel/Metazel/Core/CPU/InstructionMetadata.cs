@@ -1,18 +1,22 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Net.Sockets;
 using Metazel.Library;
 
 namespace Metazel.NES
 {
-	public partial class NESCPU
-	{
-		// ReSharper disable InconsistentNaming -> Ignore opcode names.
+    public partial class NESCPU
+    {
+        // ReSharper disable InconsistentNaming -> Ignore opcode names.
 
-		public Dictionary<byte, InstructionMetadata> InstructionMetadata;
+        private Dictionary<byte, InstructionMetadata> _instructionMetadataDictionary;
+        private readonly InstructionMetadata[] _instructionMetadataArray = new InstructionMetadata[256];
 
-		private void InitialiseInstructionMetadata()
-		{
-			InstructionMetadata = new Dictionary<byte, InstructionMetadata>
+        private void InitialiseInstructionMetadata()
+        {
+            _instructionMetadataDictionary = new Dictionary<byte, InstructionMetadata>
 			{
 				{ 0x78, new InstructionMetadata("SEI", AddressingMode.Implicit, 0, 2, (data, bytes) => { I = true; }) },
 				{ 0x58, new InstructionMetadata("CLI", AddressingMode.Implicit, 0, 2, (data, bytes) => { I = false; }) },
@@ -268,1438 +272,1472 @@ namespace Metazel.NES
 				{ 0x7B, new InstructionMetadata("RRA", AddressingMode.AbsoluteY, 2, 6, RRA) },
 				{ 0x7F, new InstructionMetadata("RRA", AddressingMode.AbsoluteX, 2, 6, RRA) },
 			};
-		}
 
-        private void BRK(InstructionMetadata metadata, byte[] operands)
-	    {
-	        TriggerInterrupt(new Interrupt(InterruptType.BRK));
-	    }
+            var unimplementedOpcodes = new List<byte>();
 
-	    private void RRA(InstructionMetadata metadata, byte[] operands)
-		{
-			var oldCarry = C;
+            for (var i = 0; i <= 0xFF; i++)
+            {
+                if (_instructionMetadataDictionary.ContainsKey((byte)i))
+                    _instructionMetadataArray[i] = _instructionMetadataDictionary[(byte)i];
+                else
+                    unimplementedOpcodes.Add((byte)i);
+            }
 
-			var address = 0;
-
-			switch (metadata.AddressingMode)
-			{
-				case AddressingMode.IndexedIndirect:
-					address = BitConverter.ToUInt16(new[] { Memory[(byte) (operands[0] + X)], Memory[(byte) (operands[0] + X + 1)] }, 0);
-					break;
-				case AddressingMode.ZeroPage:
-					address = operands[0];
-					break;
-				case AddressingMode.Absolute:
-					address = BitConverter.ToUInt16(operands, 0);
-					break;
-				case AddressingMode.IndirectIndexed:
-					var baseIndirect = BitConverter.ToUInt16(new[] { Memory[operands[0]], Memory[(byte) (operands[0] + 1)] }, 0);
-					address = baseIndirect + Y;
-					if (baseIndirect >> 8 << 8 != address >> 8 << 8)
-						_currentInstruction.CyclesLeft++;
-					break;
-				case AddressingMode.ZeroPageX:
-					address = (byte) (operands[0] + X);
-					break;
-				case AddressingMode.AbsoluteY:
-					{
-						var absolute = BitConverter.ToUInt16(operands, 0);
-						if (absolute >> 8 << 8 != (ushort) (absolute + Y) >> 8 << 8)
-							_currentInstruction.CyclesLeft++;
-						address = (ushort) (absolute + Y);
-					}
-					break;
-				case AddressingMode.AbsoluteX:
-					{
-						var absolute = BitConverter.ToUInt16(operands, 0);
-						if (absolute >> 8 << 8 != (ushort) (absolute + X) >> 8 << 8)
-							_currentInstruction.CyclesLeft++;
-						address = (ushort) (absolute + X);
-					}
-					break;
-			}
-
-            C = Memory[address].GetBit(0);
-			
-            Memory[address] >>= 1;
-			Memory[address] = Memory[address].SetBit(7, oldCarry);
-
-			Z = Memory[address] == 0;
-			N = Memory[address].GetBit(7);
-
-			var value = Memory[address];
-
-			var unsignedResult = A + (uint) value + (uint) (C ? 1 : 0);
-
-			C = unsignedResult > byte.MaxValue;
-			V = ((value ^ unsignedResult) & (A ^ unsignedResult) & 0x80) != 0;
-
-			A = (byte) unsignedResult;
-
-			Z = A == 0;
-			N = A.GetBit(7);
+            File.WriteAllText("unimplementedOpcodes.txt",
+                string.Format("var unimplementedOpcodes = new [] {{ {0} }};", string.Join(", ", from opcode in unimplementedOpcodes select "0x" + opcode.ToString("X2"))));
         }
 
-		private void SRE(InstructionMetadata metadata, byte[] operands)
-		{
-			var address = 0;
-
-			switch (metadata.AddressingMode)
-			{
-				case AddressingMode.IndexedIndirect:
-					address = BitConverter.ToUInt16(new[] { Memory[(byte) (operands[0] + X)], Memory[(byte) (operands[0] + X + 1)] }, 0);
-					break;
-				case AddressingMode.ZeroPage:
-					address = operands[0];
-					break;
-				case AddressingMode.Absolute:
-					address = BitConverter.ToUInt16(operands, 0);
-					break;
-				case AddressingMode.IndirectIndexed:
-					var baseIndirect = BitConverter.ToUInt16(new[] { Memory[operands[0]], Memory[(byte) (operands[0] + 1)] }, 0);
-					address = baseIndirect + Y;
-					if (baseIndirect >> 8 << 8 != address >> 8 << 8)
-						_currentInstruction.CyclesLeft++;
-					break;
-				case AddressingMode.ZeroPageX:
-					address = (byte) (operands[0] + X);
-					break;
-				case AddressingMode.AbsoluteY:
-					{
-						var absolute = BitConverter.ToUInt16(operands, 0);
-						if (absolute >> 8 << 8 != (ushort) (absolute + Y) >> 8 << 8)
-							_currentInstruction.CyclesLeft++;
-						address = (ushort) (absolute + Y);
-					}
-					break;
-				case AddressingMode.AbsoluteX:
-					{
-						var absolute = BitConverter.ToUInt16(operands, 0);
-						if (absolute >> 8 << 8 != (ushort) (absolute + X) >> 8 << 8)
-							_currentInstruction.CyclesLeft++;
-						address = (ushort) (absolute + X);
-					}
-					break;
-			}
-
-			C = Memory[address].GetBit(0);
-
-			Memory[address] >>= 1;
-
-			A = (byte) (A ^ Memory[address]);
-
-			Z = A == 0;
-			N = A.GetBit(7);
-		}
-
-		private void RLA(InstructionMetadata metadata, byte[] operands)
-		{
-			var oldCarry = C;
-
-			var address = 0;
-
-			switch (metadata.AddressingMode)
-			{
-				case AddressingMode.IndexedIndirect:
-					address = BitConverter.ToUInt16(new[] { Memory[(byte) (operands[0] + X)], Memory[(byte) (operands[0] + X + 1)] }, 0);
-					break;
-				case AddressingMode.ZeroPage:
-					address = operands[0];
-					break;
-				case AddressingMode.Absolute:
-					address = BitConverter.ToUInt16(operands, 0);
-					break;
-				case AddressingMode.IndirectIndexed:
-					var baseIndirect = BitConverter.ToUInt16(new[] { Memory[operands[0]], Memory[(byte) (operands[0] + 1)] }, 0);
-					address = baseIndirect + Y;
-					if (baseIndirect >> 8 << 8 != address >> 8 << 8)
-						_currentInstruction.CyclesLeft++;
-					break;
-				case AddressingMode.ZeroPageX:
-					address = (byte) (operands[0] + X);
-					break;
-				case AddressingMode.AbsoluteY:
-					{
-						var absolute = BitConverter.ToUInt16(operands, 0);
-						if (absolute >> 8 << 8 != (ushort) (absolute + Y) >> 8 << 8)
-							_currentInstruction.CyclesLeft++;
-						address = (ushort) (absolute + Y);
-					}
-					break;
-				case AddressingMode.AbsoluteX:
-					{
-						var absolute = BitConverter.ToUInt16(operands, 0);
-						if (absolute >> 8 << 8 != (ushort) (absolute + X) >> 8 << 8)
-							_currentInstruction.CyclesLeft++;
-						address = (ushort) (absolute + X);
-					}
-					break;
-			}
-
-			C = Memory[address].GetBit(7);
-
-			Memory[address] <<= 1;
-			Memory[address] = Memory[address].SetBit(0, oldCarry);
-
-			A = (byte) (A & Memory[address]);
-
-			Z = A == 0;
-			N = A.GetBit(7);
-		}
-
-		private void SLO(InstructionMetadata metadata, byte[] operands)
-		{
-			var address = 0;
-
-			switch (metadata.AddressingMode)
-			{
-				case AddressingMode.IndexedIndirect:
-					address = BitConverter.ToUInt16(new[] { Memory[(byte) (operands[0] + X)], Memory[(byte) (operands[0] + X + 1)] }, 0);
-					break;
-				case AddressingMode.ZeroPage:
-					address = operands[0];
-					break;
-				case AddressingMode.Absolute:
-					address = BitConverter.ToUInt16(operands, 0);
-					break;
-				case AddressingMode.IndirectIndexed:
-					var baseIndirect = BitConverter.ToUInt16(new[] { Memory[operands[0]], Memory[(byte) (operands[0] + 1)] }, 0);
-					address = baseIndirect + Y;
-					if (baseIndirect >> 8 << 8 != address >> 8 << 8)
-						_currentInstruction.CyclesLeft++;
-					break;
-				case AddressingMode.ZeroPageX:
-					address = (byte) (operands[0] + X);
-					break;
-				case AddressingMode.AbsoluteY:
-					{
-						var absolute = BitConverter.ToUInt16(operands, 0);
-						if (absolute >> 8 << 8 != (ushort) (absolute + Y) >> 8 << 8)
-							_currentInstruction.CyclesLeft++;
-						address = (ushort) (absolute + Y);
-					}
-					break;
-				case AddressingMode.AbsoluteX:
-					{
-						var absolute = BitConverter.ToUInt16(operands, 0);
-						if (absolute >> 8 << 8 != (ushort) (absolute + X) >> 8 << 8)
-							_currentInstruction.CyclesLeft++;
-						address = (ushort) (absolute + X);
-					}
-					break;
-			}
-
-			C = Memory[address].GetBit(7);
-
-			Memory[address] <<= 1;
-
-			A = (byte) (A | Memory[address]);
-
-			Z = A == 0;
-			N = A.GetBit(7);
-		}
-
-		private void ISB(InstructionMetadata metadata, byte[] operands)
-		{
-			var value = 0;
-
-			switch (metadata.AddressingMode)
-			{
-				case AddressingMode.IndexedIndirect:
-					value = ++Memory[BitConverter.ToUInt16(new[] { Memory[(byte) (operands[0] + X)], Memory[(byte) (operands[0] + X + 1)] }, 0)];
-					break;
-				case AddressingMode.ZeroPage:
-					value = ++Memory[operands[0]];
-					break;
-				case AddressingMode.Absolute:
-					value = ++Memory[BitConverter.ToUInt16(operands, 0)];
-					break;
-				case AddressingMode.IndirectIndexed:
-					var baseIndirect = BitConverter.ToUInt16(new[] { Memory[operands[0]], Memory[(byte) (operands[0] + 1)] }, 0);
-					var address = baseIndirect + Y;
-					if (baseIndirect >> 8 << 8 != address >> 8 << 8)
-						_currentInstruction.CyclesLeft++;
-					value = ++Memory[(ushort) address];
-					break;
-				case AddressingMode.ZeroPageX:
-					value = ++Memory[(byte) (operands[0] + X)];
-					break;
-				case AddressingMode.AbsoluteY:
-					{
-						var absolute = BitConverter.ToUInt16(operands, 0);
-						if (absolute >> 8 << 8 != (ushort) (absolute + Y) >> 8 << 8)
-							_currentInstruction.CyclesLeft++;
-						value = ++Memory[(ushort) (absolute + Y)];
-					}
-					break;
-				case AddressingMode.AbsoluteX:
-					{
-						var absolute = BitConverter.ToUInt16(operands, 0);
-						if (absolute >> 8 << 8 != (ushort) (absolute + X) >> 8 << 8)
-							_currentInstruction.CyclesLeft++;
-						value = ++Memory[(ushort) (absolute + X)];
-					}
-					break;
-			}
-
-			var unsignedResult = A + (byte) ~value + (uint) (C ? 1 : 0);
-
-			C = unsignedResult > byte.MaxValue;
-			V = (((byte) ~value ^ unsignedResult) & (A ^ unsignedResult) & 0x80) != 0;
-
-			A = (byte) unsignedResult;
-
-			Z = A == 0;
-			N = A.GetBit(7);
-		}
-
-		private void DCP(InstructionMetadata metadata, byte[] operands)
-		{
-			var value = 0;
-
-			switch (metadata.AddressingMode)
-			{
-				case AddressingMode.IndexedIndirect:
-					value = --Memory[BitConverter.ToUInt16(new[] { Memory[(byte) (operands[0] + X)], Memory[(byte) (operands[0] + X + 1)] }, 0)];
-					break;
-				case AddressingMode.ZeroPage:
-					value = --Memory[operands[0]];
-					break;
-				case AddressingMode.Absolute:
-					value = --Memory[BitConverter.ToUInt16(operands, 0)];
-					break;
-				case AddressingMode.IndirectIndexed:
-					var baseIndirect = BitConverter.ToUInt16(new[] { Memory[operands[0]], Memory[(byte) (operands[0] + 1)] }, 0);
-					var address = baseIndirect + Y;
-					if (baseIndirect >> 8 << 8 != address >> 8 << 8)
-						_currentInstruction.CyclesLeft++;
-					value = --Memory[(ushort) address];
-					break;
-				case AddressingMode.ZeroPageX:
-					value = --Memory[(byte) (operands[0] + X)];
-					break;
-				case AddressingMode.AbsoluteY:
-					{
-						var absolute = BitConverter.ToUInt16(operands, 0);
-						if (absolute >> 8 << 8 != (ushort) (absolute + Y) >> 8 << 8)
-							_currentInstruction.CyclesLeft++;
-						value = --Memory[(ushort) (absolute + Y)];
-					}
-					break;
-				case AddressingMode.AbsoluteX:
-					{
-						var absolute = BitConverter.ToUInt16(operands, 0);
-						if (absolute >> 8 << 8 != (ushort) (absolute + X) >> 8 << 8)
-							_currentInstruction.CyclesLeft++;
-						value = --Memory[(ushort) (absolute + X)];
-					}
-					break;
-			}
-
-			C = A >= value;
-			Z = A == value;
-			N = ((byte) (A - value)).GetBit(7);
-		}
-
-		private void SAX(InstructionMetadata metadata, byte[] operands)
-		{
-			switch (metadata.AddressingMode)
-			{
-				case AddressingMode.IndexedIndirect:
-					Memory[BitConverter.ToUInt16(new[] { Memory[(byte) (operands[0] + X)], Memory[(byte) (operands[0] + X + 1)] }, 0)] = (byte) (A & X);
-					break;
-				case AddressingMode.ZeroPage:
-					Memory[operands[0]] = (byte) (A & X);
-					break;
-				case AddressingMode.Absolute:
-					Memory[BitConverter.ToUInt16(operands, 0)] = (byte) (A & X);
-					break;
-				case AddressingMode.IndirectIndexed:
-					var baseIndirect = BitConverter.ToUInt16(new[] { Memory[operands[0]], Memory[(byte) (operands[0] + 1)] }, 0);
-					var address = baseIndirect + Y;
-					if (baseIndirect >> 8 << 8 != address >> 8 << 8)
-						_currentInstruction.CyclesLeft++;
-					Memory[(ushort) address] = (byte) (A & X);
-					break;
-				case AddressingMode.ZeroPageY:
-					Memory[(byte) (operands[0] + Y)] = (byte) (A & X);
-					break;
-				case AddressingMode.AbsoluteY:
-					{
-						var absolute = BitConverter.ToUInt16(operands, 0);
-						if (absolute >> 8 << 8 != (ushort) (absolute + Y) >> 8 << 8)
-							_currentInstruction.CyclesLeft++;
-						Memory[(ushort) (absolute + Y)] = (byte) (A & X);
-					}
-					break;
-			}
-		}
-
-		private void LAX(InstructionMetadata metadata, byte[] operands)
-		{
-			switch (metadata.AddressingMode)
-			{
-				case AddressingMode.IndexedIndirect:
-					A = X = Memory[BitConverter.ToUInt16(new[] { Memory[(byte) (operands[0] + X)], Memory[(byte) (operands[0] + X + 1)] }, 0)];
-					break;
-				case AddressingMode.ZeroPage:
-					A = X = Memory[operands[0]];
-					break;
-				case AddressingMode.Absolute:
-					A = X = Memory[BitConverter.ToUInt16(operands, 0)];
-					break;
-				case AddressingMode.IndirectIndexed:
-					var baseIndirect = BitConverter.ToUInt16(new[] { Memory[operands[0]], Memory[(byte) (operands[0] + 1)] }, 0);
-					var address = baseIndirect + Y;
-					if (baseIndirect >> 8 << 8 != address >> 8 << 8)
-						_currentInstruction.CyclesLeft++;
-					A = X = Memory[(ushort) address];
-					break;
-				case AddressingMode.ZeroPageY:
-					A = X = Memory[(byte) (operands[0] + Y)];
-					break;
-				case AddressingMode.AbsoluteY:
-					{
-						var absolute = BitConverter.ToUInt16(operands, 0);
-						if (absolute >> 8 << 8 != (ushort) (absolute + Y) >> 8 << 8)
-							_currentInstruction.CyclesLeft++;
-						A = X = Memory[(ushort) (absolute + Y)];
-					}
-					break;
-			}
-
-			Z = A == 0;
-			N = A.GetBit(7);
-		}
-
-		private void NOP(InstructionMetadata metadata, byte[] operands)
-		{
-			switch (metadata.AddressingMode)
-			{
-				case AddressingMode.AbsoluteX:
-					var absolute = BitConverter.ToUInt16(operands, 0);
-					if (absolute >> 8 << 8 != (ushort) (absolute + X) >> 8 << 8)
-						_currentInstruction.CyclesLeft++;
-					break;
-			}
-		}
-
-		private void ROL(InstructionMetadata metadata, byte[] operands)
-		{
-			var oldCarry = C;
-
-			switch (metadata.AddressingMode)
-			{
-				case AddressingMode.Implicit:
-					C = A.GetBit(7);
-
-					A <<= 1;
-					A = A.SetBit(0, oldCarry);
-
-					Z = A == 0;
-					N = A.GetBit(7);
-					break;
-				case AddressingMode.ZeroPage:
-					C = Memory[operands[0]].GetBit(7);
-
-					Memory[operands[0]] <<= 1;
-					Memory[operands[0]] = Memory[operands[0]].SetBit(0, oldCarry);
-
-					Z = Memory[operands[0]] == 0;
-					N = Memory[operands[0]].GetBit(7);
-					break;
-				case AddressingMode.Absolute:
-					{
-						var address = BitConverter.ToUInt16(operands, 0);
-
-						C = Memory[address].GetBit(7);
-
-						Memory[address] <<= 1;
-						Memory[address] = Memory[address].SetBit(0, oldCarry);
-
-						Z = Memory[address] == 0;
-						N = Memory[address].GetBit(7);
-						break;
-					}
-				case AddressingMode.ZeroPageX:
-					C = Memory[(byte) (operands[0] + X)].GetBit(7);
-
-					Memory[(byte) (operands[0] + X)] <<= 1;
-					Memory[(byte) (operands[0] + X)] = Memory[(byte) (operands[0] + X)].SetBit(0, oldCarry);
-
-					Z = Memory[(byte) (operands[0] + X)] == 0;
-					N = Memory[(byte) (operands[0] + X)].GetBit(7);
-					break;
-				case AddressingMode.AbsoluteX:
-					{
-						var address = BitConverter.ToUInt16(operands, 0) + X;
-
-						C = Memory[address].GetBit(7);
-
-						Memory[address] <<= 1;
-						Memory[address] = Memory[address].SetBit(0, oldCarry);
-
-						Z = Memory[address] == 0;
-						N = Memory[address].GetBit(7);
-						break;
-					}
-			}
-		}
-
-		private void ROR(InstructionMetadata metadata, byte[] operands)
-		{
-			var oldCarry = C;
-
-			switch (metadata.AddressingMode)
-			{
-				case AddressingMode.Implicit:
-					C = A.GetBit(0);
-
-					A >>= 1;
-					A = A.SetBit(7, oldCarry);
-
-					Z = A == 0;
-					N = A.GetBit(7);
-					break;
-				case AddressingMode.ZeroPage:
-					C = Memory[operands[0]].GetBit(0);
-
-					Memory[operands[0]] >>= 1;
-					Memory[operands[0]] = Memory[operands[0]].SetBit(7, oldCarry);
-
-					Z = Memory[operands[0]] == 0;
-					N = Memory[operands[0]].GetBit(7);
-					break;
-				case AddressingMode.Absolute:
-					{
-						var address = BitConverter.ToUInt16(operands, 0);
-
-						C = Memory[address].GetBit(0);
-
-						Memory[address] >>= 1;
-						Memory[address] = Memory[address].SetBit(7, oldCarry);
-
-						Z = Memory[address] == 0;
-						N = Memory[address].GetBit(7);
-						break;
-					}
-				case AddressingMode.ZeroPageX:
-					C = Memory[(byte) (operands[0] + X)].GetBit(0);
-
-					Memory[(byte) (operands[0] + X)] >>= 1;
-					Memory[(byte) (operands[0] + X)] = Memory[(byte) (operands[0] + X)].SetBit(7, oldCarry);
-
-					Z = Memory[(byte) (operands[0] + X)] == 0;
-					N = Memory[(byte) (operands[0] + X)].GetBit(7);
-					break;
-				case AddressingMode.AbsoluteX:
-					{
-						var address = BitConverter.ToUInt16(operands, 0) + X;
-
-						C = Memory[address].GetBit(0);
-
-						Memory[address] >>= 1;
-						Memory[address] = Memory[address].SetBit(7, oldCarry);
-
-						Z = Memory[address] == 0;
-						N = Memory[address].GetBit(7);
-						break;
-					}
-			}
-		}
-
-		private void ASL(InstructionMetadata metadata, byte[] operands)
-		{
-			switch (metadata.AddressingMode)
-			{
-				case AddressingMode.Implicit:
-					C = A.GetBit(7);
-
-					A <<= 1;
-
-					Z = A == 0;
-					N = A.GetBit(7);
-					break;
-				case AddressingMode.ZeroPage:
-					C = Memory[operands[0]].GetBit(7);
-
-					Memory[operands[0]] <<= 1;
-
-					Z = Memory[operands[0]] == 0;
-					N = Memory[operands[0]].GetBit(7);
-					break;
-				case AddressingMode.Absolute:
-					{
-						var address = BitConverter.ToUInt16(operands, 0);
-
-						C = Memory[address].GetBit(7);
-
-						Memory[address] <<= 1;
-
-						Z = Memory[address] == 0;
-						N = Memory[address].GetBit(7);
-						break;
-					}
-				case AddressingMode.ZeroPageX:
-					C = Memory[(byte) (operands[0] + X)].GetBit(7);
-
-					Memory[(byte) (operands[0] + X)] <<= 1;
-
-					Z = Memory[(byte) (operands[0] + X)] == 0;
-					N = Memory[(byte) (operands[0] + X)].GetBit(7);
-					break;
-				case AddressingMode.AbsoluteX:
-					{
-						var address = BitConverter.ToUInt16(operands, 0) + X;
-
-						C = Memory[address].GetBit(7);
-
-						Memory[address] <<= 1;
-
-						Z = Memory[address] == 0;
-						N = Memory[address].GetBit(7);
-						break;
-					}
-			}
-		}
-
-		private void LSR(InstructionMetadata metadata, byte[] operands)
-		{
-			switch (metadata.AddressingMode)
-			{
-				case AddressingMode.Implicit:
-					C = A.GetBit(0);
-
-					A >>= 1;
-
-					Z = A == 0;
-					N = A.GetBit(7);
-					break;
-				case AddressingMode.ZeroPage:
-					C = Memory[operands[0]].GetBit(0);
-
-					Memory[operands[0]] >>= 1;
-
-					Z = Memory[operands[0]] == 0;
-					N = Memory[operands[0]].GetBit(7);
-					break;
-				case AddressingMode.Absolute:
-					{
-						var address = BitConverter.ToUInt16(operands, 0);
-
-						C = Memory[address].GetBit(0);
-
-						Memory[address] >>= 1;
-
-						Z = Memory[address] == 0;
-						N = Memory[address].GetBit(7);
-
-						break;
-					}
-				case AddressingMode.ZeroPageX:
-					C = Memory[(byte) (operands[0] + X)].GetBit(0);
-
-					Memory[(byte) (operands[0] + X)] >>= 1;
-
-					Z = Memory[(byte) (operands[0] + X)] == 0;
-					N = Memory[(byte) (operands[0] + X)].GetBit(7);
-					break;
-				case AddressingMode.AbsoluteX:
-					{
-						var address = BitConverter.ToUInt16(operands, 0) + X;
-
-						C = Memory[address].GetBit(0);
-
-						Memory[address] >>= 1;
-
-						Z = Memory[address] == 0;
-						N = Memory[address].GetBit(7);
-
-						break;
-					}
-			}
-
-		}
-
-		private void RTI(InstructionMetadata metadata, byte[] operands)
-		{
-			P = (byte) (PopByte() & 0xEF | 0x20);
-			PC = PopUInt16();
-		}
-
-		private void TYA(InstructionMetadata metadata, byte[] operands)
-		{
-			A = Y;
-
-			Z = A == 0;
-			N = A.GetBit(7);
-		}
-
-		private void TXA(InstructionMetadata metadata, byte[] operands)
-		{
-			A = X;
-
-			Z = A == 0;
-			N = A.GetBit(7);
-		}
-
-		private void TSX(InstructionMetadata metadata, byte[] operands)
-		{
-			X = S;
-
-			Z = X == 0;
-			N = X.GetBit(7);
-		}
-
-		private void TAY(InstructionMetadata metadata, byte[] operands)
-		{
-			Y = A;
-
-			Z = Y == 0;
-			N = Y.GetBit(7);
-		}
-
-		private void TAX(InstructionMetadata metadata, byte[] operands)
-		{
-			X = A;
-
-			Z = X == 0;
-			N = X.GetBit(7);
-		}
-
-		private void DEY(InstructionMetadata metadata, byte[] operands)
-		{
-			Y--;
-
-			Z = Y == 0;
-			N = Y.GetBit(7);
-		}
-
-		private void DEX(InstructionMetadata metadata, byte[] operands)
-		{
-			X--;
-
-			Z = X == 0;
-			N = X.GetBit(7);
-		}
-
-		private void DEC(InstructionMetadata metadata, byte[] operands)
-		{
-			switch (metadata.AddressingMode)
-			{
-				case AddressingMode.ZeroPage:
-					Memory[operands[0]]--;
-
-					Z = Memory[operands[0]] == 0;
-					N = Memory[operands[0]].GetBit(7);
-					break;
-				case AddressingMode.Absolute:
-					{
-						var address = BitConverter.ToUInt16(operands, 0);
-
-						Memory[address]--;
-
-						Z = Memory[address] == 0;
-						N = Memory[address].GetBit(7);
-						break;
-					}
-				case AddressingMode.ZeroPageX:
-					Memory[(byte) (operands[0] + X)]--;
-
-					Z = Memory[(byte) (operands[0] + X)] == 0;
-					N = Memory[(byte) (operands[0] + X)].GetBit(7);
-					break;
-				case AddressingMode.AbsoluteX:
-					{
-						var address = BitConverter.ToUInt16(operands, 0) + X;
-
-						Memory[address]--;
-
-						Z = Memory[address] == 0;
-						N = Memory[address].GetBit(7);
-						break;
-					}
-			}
-		}
-
-		private void INY(InstructionMetadata metadata, byte[] operands)
-		{
-			Y++;
-
-			Z = Y == 0;
-			N = Y.GetBit(7);
-		}
-
-		private void INX(InstructionMetadata metadata, byte[] operands)
-		{
-			X++;
-
-			Z = X == 0;
-			N = X.GetBit(7);
-		}
-
-		private void INC(InstructionMetadata metadata, byte[] operands)
-		{
-			switch (metadata.AddressingMode)
-			{
-				case AddressingMode.ZeroPage:
-					Memory[operands[0]]++;
-
-					Z = Memory[operands[0]] == 0;
-					N = Memory[operands[0]].GetBit(7);
-					break;
-				case AddressingMode.Absolute:
-					{
-						var address = BitConverter.ToUInt16(operands, 0);
-
-						Memory[address]++;
-
-						Z = Memory[address] == 0;
-						N = Memory[address].GetBit(7);
-						break;
-					}
-				case AddressingMode.ZeroPageX:
-					Memory[(byte) (operands[0] + X)]++;
-
-					Z = Memory[(byte) (operands[0] + X)] == 0;
-					N = Memory[(byte) (operands[0] + X)].GetBit(7);
-					break;
-				case AddressingMode.AbsoluteX:
-					{
-						var address = BitConverter.ToUInt16(operands, 0) + X;
-
-						Memory[address]++;
-
-						Z = Memory[address] == 0;
-						N = Memory[address].GetBit(7);
-						break;
-					}
-			}
-		}
-
-		private void ADC(InstructionMetadata metadata, byte[] operands)
-		{
-			var value = 0;
-
-			switch (metadata.AddressingMode)
-			{
-				case AddressingMode.Immediate:
-					value = operands[0];
-					break;
-				case AddressingMode.IndexedIndirect:
-					value = Memory[BitConverter.ToUInt16(new[] { Memory[(byte) (operands[0] + X)], Memory[(byte) (operands[0] + X + 1)] }, 0)];
-					break;
-				case AddressingMode.ZeroPage:
-					value = Memory[operands[0]];
-					break;
-				case AddressingMode.Absolute:
-					value = Memory[BitConverter.ToUInt16(operands, 0)];
-					break;
-				case AddressingMode.IndirectIndexed:
-					var baseIndirect = BitConverter.ToUInt16(new[] { Memory[operands[0]], Memory[(byte) (operands[0] + 1)] }, 0);
-					var address = baseIndirect + Y;
-					if (baseIndirect >> 8 << 8 != address >> 8 << 8)
-						_currentInstruction.CyclesLeft++;
-					value = Memory[(ushort) address];
-					break;
-				case AddressingMode.AbsoluteY:
-					{
-						var absolute = BitConverter.ToUInt16(operands, 0);
-						if (absolute >> 8 << 8 != (ushort) (absolute + Y) >> 8 << 8)
-							_currentInstruction.CyclesLeft++;
-						value = Memory[(ushort) (absolute + Y)];
-						break;
-					}
-				case AddressingMode.ZeroPageX:
-					value = Memory[(byte) (operands[0] + X)];
-					break;
-				case AddressingMode.AbsoluteX:
-					{
-						var absolute = BitConverter.ToUInt16(operands, 0);
-						if (absolute >> 8 << 8 != (ushort) (absolute + X) >> 8 << 8)
-							_currentInstruction.CyclesLeft++;
-						value = Memory[(ushort) (absolute + X)];
-						break;
-					}
-			}
-
-			var unsignedResult = A + (uint) value + (uint) (C ? 1 : 0);
-
-			C = unsignedResult > byte.MaxValue;
-			V = ((value ^ unsignedResult) & (A ^ unsignedResult) & 0x80) != 0;
-
-			A = (byte) unsignedResult;
-
-			Z = A == 0;
-			N = A.GetBit(7);
-		}
-
-		private void SBC(InstructionMetadata metadata, byte[] operands)
-		{
-			var value = 0;
-
-			switch (metadata.AddressingMode)
-			{
-				case AddressingMode.Immediate:
-					value = operands[0];
-					break;
-				case AddressingMode.IndexedIndirect:
-					value = Memory[BitConverter.ToUInt16(new[] { Memory[(byte) (operands[0] + X)], Memory[(byte) (operands[0] + X + 1)] }, 0)];
-					break;
-				case AddressingMode.ZeroPage:
-					value = Memory[operands[0]];
-					break;
-				case AddressingMode.Absolute:
-					value = Memory[BitConverter.ToUInt16(operands, 0)];
-					break;
-				case AddressingMode.IndirectIndexed:
-					var baseIndirect = BitConverter.ToUInt16(new[] { Memory[operands[0]], Memory[(byte) (operands[0] + 1)] }, 0);
-					var address = baseIndirect + Y;
-					if (baseIndirect >> 8 << 8 != address >> 8 << 8)
-						_currentInstruction.CyclesLeft++;
-					value = Memory[(ushort) address];
-					break;
-				case AddressingMode.AbsoluteY:
-					{
-						var absolute = BitConverter.ToUInt16(operands, 0);
-						if (absolute >> 8 << 8 != (ushort) (absolute + Y) >> 8 << 8)
-							_currentInstruction.CyclesLeft++;
-						value = Memory[(ushort) (absolute + Y)];
-						break;
-					}
-				case AddressingMode.ZeroPageX:
-					value = Memory[(byte) (operands[0] + X)];
-					break;
-				case AddressingMode.AbsoluteX:
-					{
-						var absolute = BitConverter.ToUInt16(operands, 0);
-						if (absolute >> 8 << 8 != (ushort) (absolute + X) >> 8 << 8)
-							_currentInstruction.CyclesLeft++;
-						value = Memory[(ushort) (absolute + X)];
-						break;
-					}
-			}
-
-			var unsignedResult = A + (byte) ~value + (uint) (C ? 1 : 0);
-
-			C = unsignedResult > byte.MaxValue;
-			V = (((byte) ~value ^ unsignedResult) & (A ^ unsignedResult) & 0x80) != 0;
-
-			A = (byte) unsignedResult;
-
-			Z = A == 0;
-			N = A.GetBit(7);
-		}
-
-		private void CPY(InstructionMetadata metadata, byte[] operands)
-		{
-			var value = 0;
-
-			switch (metadata.AddressingMode)
-			{
-				case AddressingMode.Immediate:
-					value = operands[0];
-					break;
-				case AddressingMode.ZeroPage:
-					value = Memory[operands[0]];
-					break;
-				case AddressingMode.Absolute:
-					value = Memory[BitConverter.ToUInt16(operands, 0)];
-					break;
-			}
-
-			C = Y >= value;
-			Z = Y == value;
-			N = ((byte) (Y - value)).GetBit(7);
-		}
-
-		private void CPX(InstructionMetadata metadata, byte[] operands)
-		{
-			var value = 0;
-
-			switch (metadata.AddressingMode)
-			{
-				case AddressingMode.Immediate:
-					value = operands[0];
-					break;
-				case AddressingMode.ZeroPage:
-					value = Memory[operands[0]];
-					break;
-				case AddressingMode.Absolute:
-					value = Memory[BitConverter.ToUInt16(operands, 0)];
-					break;
-			}
-
-			C = X >= value;
-			Z = X == value;
-			N = ((byte) (X - value)).GetBit(7);
-		}
-
-		private void CMP(InstructionMetadata metadata, byte[] operands)
-		{
-			var value = 0;
-
-			switch (metadata.AddressingMode)
-			{
-				case AddressingMode.Immediate:
-					value = operands[0];
-					break;
-				case AddressingMode.IndexedIndirect:
-					value = Memory[BitConverter.ToUInt16(new[] { Memory[(byte) (operands[0] + X)], Memory[(byte) (operands[0] + X + 1)] }, 0)];
-					break;
-				case AddressingMode.ZeroPage:
-					value = Memory[operands[0]];
-					break;
-				case AddressingMode.Absolute:
-					value = Memory[BitConverter.ToUInt16(operands, 0)];
-					break;
-				case AddressingMode.IndirectIndexed:
-					var baseIndirect = BitConverter.ToUInt16(new[] { Memory[operands[0]], Memory[(byte) (operands[0] + 1)] }, 0);
-					var address = baseIndirect + Y;
-					if (baseIndirect >> 8 << 8 != address >> 8 << 8)
-						_currentInstruction.CyclesLeft++;
-					value = Memory[(ushort) address];
-					break;
-				case AddressingMode.AbsoluteY:
-					{
-						var absolute = BitConverter.ToUInt16(operands, 0);
-						if (absolute >> 8 << 8 != (ushort) (absolute + Y) >> 8 << 8)
-							_currentInstruction.CyclesLeft++;
-						value = Memory[(ushort) (absolute + Y)];
-						break;
-					}
-				case AddressingMode.ZeroPageX:
-					value = Memory[(byte) (operands[0] + X)];
-					break;
-				case AddressingMode.AbsoluteX:
-					{
-						var absolute = BitConverter.ToUInt16(operands, 0);
-						if (absolute >> 8 << 8 != (ushort) (absolute + X) >> 8 << 8)
-							_currentInstruction.CyclesLeft++;
-						value = Memory[(ushort) (absolute + X)];
-						break;
-					}
-			}
-
-			C = A >= value;
-			Z = A == value;
-			N = ((byte) (A - value)).GetBit(7);
-		}
-
-		private void EOR(InstructionMetadata metadata, byte[] operands)
-		{
-			switch (metadata.AddressingMode)
-			{
-				case AddressingMode.Immediate:
-					A = (byte) (A ^ operands[0]);
-					break;
-				case AddressingMode.IndexedIndirect:
-					A = (byte) (A ^ Memory[BitConverter.ToUInt16(new[] { Memory[(byte) (operands[0] + X)], Memory[(byte) (operands[0] + X + 1)] }, 0)]);
-					break;
-				case AddressingMode.ZeroPage:
-					A = (byte) (A ^ Memory[operands[0]]);
-					break;
-				case AddressingMode.Absolute:
-					A = (byte) (A ^ Memory[BitConverter.ToUInt16(operands, 0)]);
-					break;
-				case AddressingMode.IndirectIndexed:
-					var baseIndirect = BitConverter.ToUInt16(new[] { Memory[operands[0]], Memory[(byte) (operands[0] + 1)] }, 0);
-					var address = baseIndirect + Y;
-					if (baseIndirect >> 8 << 8 != address >> 8 << 8)
-						_currentInstruction.CyclesLeft++;
-					A = (byte) (A ^ Memory[(ushort) address]);
-					break;
-				case AddressingMode.AbsoluteY:
-					{
-						var absolute = BitConverter.ToUInt16(operands, 0);
-						if (absolute >> 8 << 8 != (ushort) (absolute + Y) >> 8 << 8)
-							_currentInstruction.CyclesLeft++;
-						A = (byte) (A ^ Memory[(ushort) (absolute + Y)]);
-						break;
-					}
-				case AddressingMode.ZeroPageX:
-					A = (byte) (A ^ Memory[(byte) (operands[0] + X)]);
-					break;
-				case AddressingMode.AbsoluteX:
-					{
-						var absolute = BitConverter.ToUInt16(operands, 0);
-						if (absolute >> 8 << 8 != (ushort) (absolute + X) >> 8 << 8)
-							_currentInstruction.CyclesLeft++;
-						A = (byte) (A ^ Memory[(ushort) (absolute + X)]);
-						break;
-					}
-			}
-
-			Z = A == 0;
-			N = A.GetBit(7);
-		}
-
-		private void ORA(InstructionMetadata metadata, byte[] operands)
-		{
-			switch (metadata.AddressingMode)
-			{
-				case AddressingMode.Immediate:
-					A = (byte) (A | operands[0]);
-					break;
-				case AddressingMode.IndexedIndirect:
-					A = (byte) (A | Memory[BitConverter.ToUInt16(new[] { Memory[(byte) (operands[0] + X)], Memory[(byte) (operands[0] + X + 1)] }, 0)]);
-					break;
-				case AddressingMode.ZeroPage:
-					A = (byte) (A | Memory[operands[0]]);
-					break;
-				case AddressingMode.Absolute:
-					A = (byte) (A | Memory[BitConverter.ToUInt16(operands, 0)]);
-					break;
-				case AddressingMode.IndirectIndexed:
-					var baseIndirect = BitConverter.ToUInt16(new[] { Memory[operands[0]], Memory[(byte) (operands[0] + 1)] }, 0);
-					var address = baseIndirect + Y;
-					if (baseIndirect >> 8 << 8 != address >> 8 << 8)
-						_currentInstruction.CyclesLeft++;
-					A = (byte) (A | Memory[(ushort) address]);
-					break;
-				case AddressingMode.AbsoluteY:
-					{
-						var absolute = BitConverter.ToUInt16(operands, 0);
-						if (absolute >> 8 << 8 != (ushort) (absolute + Y) >> 8 << 8)
-							_currentInstruction.CyclesLeft++;
-						A = (byte) (A | Memory[(ushort) (absolute + Y)]);
-						break;
-					}
-				case AddressingMode.ZeroPageX:
-					A = (byte) (A | Memory[(byte) (operands[0] + X)]);
-					break;
-				case AddressingMode.AbsoluteX:
-					{
-						var absolute = BitConverter.ToUInt16(operands, 0);
-						if (absolute >> 8 << 8 != (ushort) (absolute + X) >> 8 << 8)
-							_currentInstruction.CyclesLeft++;
-						A = (byte) (A | Memory[(ushort) (absolute + X)]);
-						break;
-					}
-			}
-
-			Z = A == 0;
-			N = A.GetBit(7);
-		}
-
-		private void AND(InstructionMetadata metadata, byte[] operands)
-		{
-			switch (metadata.AddressingMode)
-			{
-				case AddressingMode.Immediate:
-					A = (byte) (A & operands[0]);
-					break;
-				case AddressingMode.IndexedIndirect:
-					A = (byte) (A & Memory[BitConverter.ToUInt16(new[] { Memory[(byte) (operands[0] + X)], Memory[(byte) (operands[0] + X + 1)] }, 0)]);
-					break;
-				case AddressingMode.ZeroPage:
-					A = (byte) (A & Memory[operands[0]]);
-					break;
-				case AddressingMode.Absolute:
-					A = (byte) (A & Memory[BitConverter.ToUInt16(operands, 0)]);
-					break;
-				case AddressingMode.IndirectIndexed:
-					var baseIndirect = BitConverter.ToUInt16(new[] { Memory[operands[0]], Memory[(byte) (operands[0] + 1)] }, 0);
-					var address = baseIndirect + Y;
-					if (baseIndirect >> 8 << 8 != address >> 8 << 8)
-						_currentInstruction.CyclesLeft++;
-					A = (byte) (A & Memory[(ushort) address]);
-					break;
-				case AddressingMode.AbsoluteY:
-					{
-						var absolute = BitConverter.ToUInt16(operands, 0);
-						if (absolute >> 8 << 8 != (ushort) (absolute + Y) >> 8 << 8)
-							_currentInstruction.CyclesLeft++;
-						A = (byte) (A & Memory[(ushort) (absolute + Y)]);
-						break;
-					}
-				case AddressingMode.ZeroPageX:
-					A = (byte) (A & Memory[(byte) (operands[0] + X)]);
-					break;
-				case AddressingMode.AbsoluteX:
-					{
-						var absolute = BitConverter.ToUInt16(operands, 0);
-						if (absolute >> 8 << 8 != (ushort) (absolute + X) >> 8 << 8)
-							_currentInstruction.CyclesLeft++;
-						A = (byte) (A & Memory[(ushort) (absolute + X)]);
-						break;
-					}
-			}
-
-			Z = A == 0;
-			N = A.GetBit(7);
-		}
-
-		private void PLA(InstructionMetadata metadata, byte[] operands)
-		{
-			A = PopByte();
-
-			Z = A == 0;
-			N = A.GetBit(7);
-		}
-
-		private void RTS(InstructionMetadata metadata, byte[] operands)
-		{
-			PC = (ushort) (PopUInt16() + 1);
-		}
-
-		private void BIT(InstructionMetadata metadata, byte[] operands)
-		{
-			byte value = 0;
-
-			switch (metadata.AddressingMode)
-			{
-				case AddressingMode.ZeroPage:
-					value = Memory[operands[0]];
-					break;
-				case AddressingMode.Absolute:
-					value = Memory[BitConverter.ToUInt16(operands, 0)];
-					break;
-			}
-
-			Z = (A & value) == 0;
-			V = value.GetBit(6);
-			N = value.GetBit(7);
-		}
-
-		private void B(IList<byte> operands, bool flag, bool state)
-		{
-			if (flag == state)
-			{
-				var target = (ushort) (PC + (sbyte) operands[0]);
-
-				if (PC >> 8 << 8 != target >> 8 << 8)
-					_currentInstruction.CyclesLeft++;
-
-				PC = target;
-
-				_currentInstruction.CyclesLeft++;
-			}
-		}
-
-		private void JMP(InstructionMetadata metadata, byte[] operands)
-		{
-			switch (metadata.AddressingMode)
-			{
-				case AddressingMode.Absolute:
-					PC = BitConverter.ToUInt16(operands, 0);
-					break;
-				case AddressingMode.Indirect:
-					var indirect = BitConverter.ToUInt16(operands, 0);
-					PC = BitConverter.ToUInt16(new[] { Memory[indirect], (indirect & 0xFF) == 0xFF ? Memory[indirect - 0xFF] : Memory[indirect + 1] }, 0);
-					break;
-			}
-		}
-
-		private void JSR(InstructionMetadata metadata, byte[] operands)
-		{
-			Push((ushort) (PC - 1));
-
-			PC = BitConverter.ToUInt16(operands, 0);
-		}
-
-		private void STA(InstructionMetadata metadata, byte[] operands)
-		{
-			switch (metadata.AddressingMode)
-			{
-				case AddressingMode.ZeroPage:
-					Memory[operands[0]] = A;
-					break;
-				case AddressingMode.Absolute:
-					Memory[BitConverter.ToUInt16(operands, 0)] = A;
-					break;
-				case AddressingMode.IndexedIndirect:
-					Memory[BitConverter.ToUInt16(new[] { Memory[(byte) (operands[0] + X)], Memory[(byte) (operands[0] + X + 1)] }, 0)] = A;
-					break;
-				case AddressingMode.IndirectIndexed:
-					var baseIndirect = BitConverter.ToUInt16(new[] { Memory[operands[0]], Memory[(byte) (operands[0] + 1)] }, 0);
-					var address = baseIndirect + Y;
-					Memory[(ushort) address] = A;
-					break;
-				case AddressingMode.AbsoluteY:
-					{
-						var absolute = BitConverter.ToUInt16(operands, 0);
-						Memory[(ushort) (absolute + Y)] = A;
-						break;
-					}
-				case AddressingMode.ZeroPageX:
-					Memory[(byte) (operands[0] + X)] = A;
-					break;
-				case AddressingMode.AbsoluteX:
-					{
-						var absolute = BitConverter.ToUInt16(operands, 0);
-						Memory[(ushort) (absolute + X)] = A;
-						break;
-					}
-			}
-		}
-
-		private void STX(InstructionMetadata metadata, byte[] operands)
-		{
-			switch (metadata.AddressingMode)
-			{
-				case AddressingMode.ZeroPage:
-					Memory[operands[0]] = X;
-					break;
-				case AddressingMode.Absolute:
-					Memory[BitConverter.ToUInt16(operands, 0)] = X;
-					break;
-				case AddressingMode.ZeroPageY:
-					Memory[(byte) (operands[0] + Y)] = X;
-					break;
-			}
-		}
-
-		private void STY(InstructionMetadata metadata, byte[] operands)
-		{
-			switch (metadata.AddressingMode)
-			{
-				case AddressingMode.ZeroPage:
-					Memory[operands[0]] = Y;
-					break;
-				case AddressingMode.Absolute:
-					Memory[BitConverter.ToUInt16(operands, 0)] = Y;
-					break;
-				case AddressingMode.ZeroPageX:
-					Memory[(byte) (operands[0] + X)] = Y;
-					break;
-			}
-		}
-
-		private void LDA(InstructionMetadata metadata, byte[] operands)
-		{
-			switch (metadata.AddressingMode)
-			{
-				case AddressingMode.Immediate:
-					A = operands[0];
-					break;
-				case AddressingMode.Absolute:
-					A = Memory[BitConverter.ToUInt16(operands, 0)];
-					break;
-				case AddressingMode.ZeroPage:
-					A = Memory[operands[0]];
-					break;
-				case AddressingMode.IndexedIndirect:
-					A = Memory[BitConverter.ToUInt16(new[] { Memory[(byte) (operands[0] + X)], Memory[(byte) (operands[0] + X + 1)] }, 0)];
-					break;
-				case AddressingMode.IndirectIndexed:
-					var baseIndirect = BitConverter.ToUInt16(new[] { Memory[operands[0]], Memory[(byte) (operands[0] + 1)] }, 0);
-					var address = baseIndirect + Y;
-					if (baseIndirect >> 8 << 8 != address >> 8 << 8)
-						_currentInstruction.CyclesLeft++;
-					A = Memory[(ushort) address];
-					break;
-				case AddressingMode.AbsoluteY:
-					{
-						var absolute = BitConverter.ToUInt16(operands, 0);
-						if (absolute >> 8 << 8 != (ushort) (absolute + Y) >> 8 << 8)
-							_currentInstruction.CyclesLeft++;
-						A = Memory[(ushort) (absolute + Y)];
-					}
-					break;
-				case AddressingMode.ZeroPageX:
-					A = Memory[(byte) (operands[0] + X)];
-					break;
-				case AddressingMode.AbsoluteX:
-					{
-						var absolute = BitConverter.ToUInt16(operands, 0);
-						if (absolute >> 8 << 8 != (ushort) (absolute + X) >> 8 << 8)
-							_currentInstruction.CyclesLeft++;
-						A = Memory[(ushort) (absolute + X)];
-					}
-					break;
-			}
-
-			Z = A == 0;
-			N = A.GetBit(7);
-		}
-
-		private void LDX(InstructionMetadata metadata, byte[] operands)
-		{
-			switch (metadata.AddressingMode)
-			{
-				case AddressingMode.Immediate:
-					X = operands[0];
-					break;
-				case AddressingMode.Absolute:
-					X = Memory[BitConverter.ToUInt16(operands, 0)];
-					break;
-				case AddressingMode.ZeroPage:
-					X = Memory[operands[0]];
-					break;
-				case AddressingMode.ZeroPageY:
-					X = Memory[(byte) (operands[0] + Y)];
-					break;
-				case AddressingMode.AbsoluteY:
-					var absolute = BitConverter.ToUInt16(operands, 0);
-					if (absolute >> 8 << 8 != (ushort) (absolute + Y) >> 8 << 8)
-						_currentInstruction.CyclesLeft++;
-					X = Memory[(ushort) (absolute + Y)];
-					break;
-			}
-
-			Z = X == 0;
-			N = X.GetBit(7);
-		}
-
-		private void LDY(InstructionMetadata metadata, byte[] operands)
-		{
-			switch (metadata.AddressingMode)
-			{
-				case AddressingMode.Immediate:
-					Y = operands[0];
-					break;
-				case AddressingMode.Absolute:
-					Y = Memory[BitConverter.ToUInt16(operands, 0)];
-					break;
-				case AddressingMode.ZeroPage:
-					Y = Memory[operands[0]];
-					break;
-				case AddressingMode.ZeroPageX:
-					Y = Memory[(byte) (operands[0] + X)];
-					break;
-				case AddressingMode.AbsoluteX:
-					var absolute = BitConverter.ToUInt16(operands, 0);
-					if (absolute >> 8 << 8 != (ushort) (absolute + X) >> 8 << 8)
-						_currentInstruction.CyclesLeft++;
-					Y = Memory[(ushort) (absolute + X)];
-					break;
-			}
-
-			Z = Y == 0;
-			N = Y.GetBit(7);
-		}
-	}
-
-	public struct InstructionMetadata
-	{
-		public readonly Action<InstructionMetadata, byte[]> Action;
-		public readonly AddressingMode AddressingMode;
-		public readonly int CycleCount;
-		public readonly string Name;
-		public readonly ushort OperandSize;
-
-		public InstructionMetadata(string name, AddressingMode addressingMode, ushort operandSize, int cycleCount, Action<InstructionMetadata, byte[]> action)
-		{
-			Name = name;
-			AddressingMode = addressingMode;
-			OperandSize = operandSize;
-			CycleCount = cycleCount;
-			Action = action;
-		}
-
-		public static bool operator ==(InstructionMetadata a, InstructionMetadata b)
-		{
-			return a.Name == b.Name &&
-				a.AddressingMode == b.AddressingMode &&
-				a.CycleCount == b.CycleCount &&
-				a.OperandSize == b.OperandSize &&
-				a.Action == b.Action;
-		}
-
-		public static bool operator !=(InstructionMetadata a, InstructionMetadata b)
-		{
-			return !(a == b);
-		}
-	}
+        private void BRK(InstructionMetadata metadata, byte[] operands)
+        {
+            TriggerInterrupt(new Interrupt(InterruptType.BRK));
+        }
+
+        private void RRA(InstructionMetadata metadata, byte[] operands)
+        {
+            var oldCarry = C;
+
+            var address = 0;
+
+            switch (metadata.AddressingMode)
+            {
+                case AddressingMode.IndexedIndirect:
+                    address = BitConverter.ToUInt16(new[] { Memory[(byte)(operands[0] + X)], Memory[(byte)(operands[0] + X + 1)] }, 0);
+                    break;
+                case AddressingMode.ZeroPage:
+                    address = operands[0];
+                    break;
+                case AddressingMode.Absolute:
+                    address = BitConverter.ToUInt16(operands, 0);
+                    break;
+                case AddressingMode.IndirectIndexed:
+                    var baseIndirect = BitConverter.ToUInt16(new[] { Memory[operands[0]], Memory[(byte)(operands[0] + 1)] }, 0);
+                    address = baseIndirect + Y;
+                    if (baseIndirect >> 8 << 8 != address >> 8 << 8)
+                        _currentInstruction.CyclesLeft++;
+                    break;
+                case AddressingMode.ZeroPageX:
+                    address = (byte)(operands[0] + X);
+                    break;
+                case AddressingMode.AbsoluteY:
+                    {
+                        var absolute = BitConverter.ToUInt16(operands, 0);
+                        if (absolute >> 8 << 8 != (ushort)(absolute + Y) >> 8 << 8)
+                            _currentInstruction.CyclesLeft++;
+                        address = (ushort)(absolute + Y);
+                    }
+                    break;
+                case AddressingMode.AbsoluteX:
+                    {
+                        var absolute = BitConverter.ToUInt16(operands, 0);
+                        if (absolute >> 8 << 8 != (ushort)(absolute + X) >> 8 << 8)
+                            _currentInstruction.CyclesLeft++;
+                        address = (ushort)(absolute + X);
+                    }
+                    break;
+            }
+
+            C = Memory[address].GetBit(0);
+
+            Memory[address] >>= 1;
+            Memory[address] = Memory[address].SetBit(7, oldCarry);
+
+            Z = Memory[address] == 0;
+            N = Memory[address].GetBit(7);
+
+            var value = Memory[address];
+
+            var unsignedResult = A + (uint)value + (uint)(C ? 1 : 0);
+
+            C = unsignedResult > byte.MaxValue;
+            V = ((value ^ unsignedResult) & (A ^ unsignedResult) & 0x80) != 0;
+
+            A = (byte)unsignedResult;
+
+            Z = A == 0;
+            N = A.GetBit(7);
+        }
+
+        private void SRE(InstructionMetadata metadata, byte[] operands)
+        {
+            var address = 0;
+
+            switch (metadata.AddressingMode)
+            {
+                case AddressingMode.IndexedIndirect:
+                    address = BitConverter.ToUInt16(new[] { Memory[(byte)(operands[0] + X)], Memory[(byte)(operands[0] + X + 1)] }, 0);
+                    break;
+                case AddressingMode.ZeroPage:
+                    address = operands[0];
+                    break;
+                case AddressingMode.Absolute:
+                    address = BitConverter.ToUInt16(operands, 0);
+                    break;
+                case AddressingMode.IndirectIndexed:
+                    var baseIndirect = BitConverter.ToUInt16(new[] { Memory[operands[0]], Memory[(byte)(operands[0] + 1)] }, 0);
+                    address = baseIndirect + Y;
+                    if (baseIndirect >> 8 << 8 != address >> 8 << 8)
+                        _currentInstruction.CyclesLeft++;
+                    break;
+                case AddressingMode.ZeroPageX:
+                    address = (byte)(operands[0] + X);
+                    break;
+                case AddressingMode.AbsoluteY:
+                    {
+                        var absolute = BitConverter.ToUInt16(operands, 0);
+                        if (absolute >> 8 << 8 != (ushort)(absolute + Y) >> 8 << 8)
+                            _currentInstruction.CyclesLeft++;
+                        address = (ushort)(absolute + Y);
+                    }
+                    break;
+                case AddressingMode.AbsoluteX:
+                    {
+                        var absolute = BitConverter.ToUInt16(operands, 0);
+                        if (absolute >> 8 << 8 != (ushort)(absolute + X) >> 8 << 8)
+                            _currentInstruction.CyclesLeft++;
+                        address = (ushort)(absolute + X);
+                    }
+                    break;
+            }
+
+            C = Memory[address].GetBit(0);
+
+            Memory[address] >>= 1;
+
+            A = (byte)(A ^ Memory[address]);
+
+            Z = A == 0;
+            N = A.GetBit(7);
+        }
+
+        private void RLA(InstructionMetadata metadata, byte[] operands)
+        {
+            var oldCarry = C;
+
+            var address = 0;
+
+            switch (metadata.AddressingMode)
+            {
+                case AddressingMode.IndexedIndirect:
+                    address = BitConverter.ToUInt16(new[] { Memory[(byte)(operands[0] + X)], Memory[(byte)(operands[0] + X + 1)] }, 0);
+                    break;
+                case AddressingMode.ZeroPage:
+                    address = operands[0];
+                    break;
+                case AddressingMode.Absolute:
+                    address = BitConverter.ToUInt16(operands, 0);
+                    break;
+                case AddressingMode.IndirectIndexed:
+                    var baseIndirect = BitConverter.ToUInt16(new[] { Memory[operands[0]], Memory[(byte)(operands[0] + 1)] }, 0);
+                    address = baseIndirect + Y;
+                    if (baseIndirect >> 8 << 8 != address >> 8 << 8)
+                        _currentInstruction.CyclesLeft++;
+                    break;
+                case AddressingMode.ZeroPageX:
+                    address = (byte)(operands[0] + X);
+                    break;
+                case AddressingMode.AbsoluteY:
+                    {
+                        var absolute = BitConverter.ToUInt16(operands, 0);
+                        if (absolute >> 8 << 8 != (ushort)(absolute + Y) >> 8 << 8)
+                            _currentInstruction.CyclesLeft++;
+                        address = (ushort)(absolute + Y);
+                    }
+                    break;
+                case AddressingMode.AbsoluteX:
+                    {
+                        var absolute = BitConverter.ToUInt16(operands, 0);
+                        if (absolute >> 8 << 8 != (ushort)(absolute + X) >> 8 << 8)
+                            _currentInstruction.CyclesLeft++;
+                        address = (ushort)(absolute + X);
+                    }
+                    break;
+            }
+
+            C = Memory[address].GetBit(7);
+
+            Memory[address] <<= 1;
+            Memory[address] = Memory[address].SetBit(0, oldCarry);
+
+            A = (byte)(A & Memory[address]);
+
+            Z = A == 0;
+            N = A.GetBit(7);
+        }
+
+        private void SLO(InstructionMetadata metadata, byte[] operands)
+        {
+            var address = 0;
+
+            switch (metadata.AddressingMode)
+            {
+                case AddressingMode.IndexedIndirect:
+                    address = BitConverter.ToUInt16(new[] { Memory[(byte)(operands[0] + X)], Memory[(byte)(operands[0] + X + 1)] }, 0);
+                    break;
+                case AddressingMode.ZeroPage:
+                    address = operands[0];
+                    break;
+                case AddressingMode.Absolute:
+                    address = BitConverter.ToUInt16(operands, 0);
+                    break;
+                case AddressingMode.IndirectIndexed:
+                    var baseIndirect = BitConverter.ToUInt16(new[] { Memory[operands[0]], Memory[(byte)(operands[0] + 1)] }, 0);
+                    address = baseIndirect + Y;
+                    if (baseIndirect >> 8 << 8 != address >> 8 << 8)
+                        _currentInstruction.CyclesLeft++;
+                    break;
+                case AddressingMode.ZeroPageX:
+                    address = (byte)(operands[0] + X);
+                    break;
+                case AddressingMode.AbsoluteY:
+                    {
+                        var absolute = BitConverter.ToUInt16(operands, 0);
+                        if (absolute >> 8 << 8 != (ushort)(absolute + Y) >> 8 << 8)
+                            _currentInstruction.CyclesLeft++;
+                        address = (ushort)(absolute + Y);
+                    }
+                    break;
+                case AddressingMode.AbsoluteX:
+                    {
+                        var absolute = BitConverter.ToUInt16(operands, 0);
+                        if (absolute >> 8 << 8 != (ushort)(absolute + X) >> 8 << 8)
+                            _currentInstruction.CyclesLeft++;
+                        address = (ushort)(absolute + X);
+                    }
+                    break;
+            }
+
+            C = Memory[address].GetBit(7);
+
+            Memory[address] <<= 1;
+
+            A = (byte)(A | Memory[address]);
+
+            Z = A == 0;
+            N = A.GetBit(7);
+        }
+
+        private void ISB(InstructionMetadata metadata, byte[] operands)
+        {
+            var value = 0;
+
+            switch (metadata.AddressingMode)
+            {
+                case AddressingMode.IndexedIndirect:
+                    value = ++Memory[BitConverter.ToUInt16(new[] { Memory[(byte)(operands[0] + X)], Memory[(byte)(operands[0] + X + 1)] }, 0)];
+                    break;
+                case AddressingMode.ZeroPage:
+                    value = ++Memory[operands[0]];
+                    break;
+                case AddressingMode.Absolute:
+                    value = ++Memory[BitConverter.ToUInt16(operands, 0)];
+                    break;
+                case AddressingMode.IndirectIndexed:
+                    var baseIndirect = BitConverter.ToUInt16(new[] { Memory[operands[0]], Memory[(byte)(operands[0] + 1)] }, 0);
+                    var address = baseIndirect + Y;
+                    if (baseIndirect >> 8 << 8 != address >> 8 << 8)
+                        _currentInstruction.CyclesLeft++;
+                    value = ++Memory[(ushort)address];
+                    break;
+                case AddressingMode.ZeroPageX:
+                    value = ++Memory[(byte)(operands[0] + X)];
+                    break;
+                case AddressingMode.AbsoluteY:
+                    {
+                        var absolute = BitConverter.ToUInt16(operands, 0);
+                        if (absolute >> 8 << 8 != (ushort)(absolute + Y) >> 8 << 8)
+                            _currentInstruction.CyclesLeft++;
+                        value = ++Memory[(ushort)(absolute + Y)];
+                    }
+                    break;
+                case AddressingMode.AbsoluteX:
+                    {
+                        var absolute = BitConverter.ToUInt16(operands, 0);
+                        if (absolute >> 8 << 8 != (ushort)(absolute + X) >> 8 << 8)
+                            _currentInstruction.CyclesLeft++;
+                        value = ++Memory[(ushort)(absolute + X)];
+                    }
+                    break;
+            }
+
+            var unsignedResult = A + (byte)~value + (uint)(C ? 1 : 0);
+
+            C = unsignedResult > byte.MaxValue;
+            V = (((byte)~value ^ unsignedResult) & (A ^ unsignedResult) & 0x80) != 0;
+
+            A = (byte)unsignedResult;
+
+            Z = A == 0;
+            N = A.GetBit(7);
+        }
+
+        private void DCP(InstructionMetadata metadata, byte[] operands)
+        {
+            var value = 0;
+
+            switch (metadata.AddressingMode)
+            {
+                case AddressingMode.IndexedIndirect:
+                    value = --Memory[BitConverter.ToUInt16(new[] { Memory[(byte)(operands[0] + X)], Memory[(byte)(operands[0] + X + 1)] }, 0)];
+                    break;
+                case AddressingMode.ZeroPage:
+                    value = --Memory[operands[0]];
+                    break;
+                case AddressingMode.Absolute:
+                    value = --Memory[BitConverter.ToUInt16(operands, 0)];
+                    break;
+                case AddressingMode.IndirectIndexed:
+                    var baseIndirect = BitConverter.ToUInt16(new[] { Memory[operands[0]], Memory[(byte)(operands[0] + 1)] }, 0);
+                    var address = baseIndirect + Y;
+                    if (baseIndirect >> 8 << 8 != address >> 8 << 8)
+                        _currentInstruction.CyclesLeft++;
+                    value = --Memory[(ushort)address];
+                    break;
+                case AddressingMode.ZeroPageX:
+                    value = --Memory[(byte)(operands[0] + X)];
+                    break;
+                case AddressingMode.AbsoluteY:
+                    {
+                        var absolute = BitConverter.ToUInt16(operands, 0);
+                        if (absolute >> 8 << 8 != (ushort)(absolute + Y) >> 8 << 8)
+                            _currentInstruction.CyclesLeft++;
+                        value = --Memory[(ushort)(absolute + Y)];
+                    }
+                    break;
+                case AddressingMode.AbsoluteX:
+                    {
+                        var absolute = BitConverter.ToUInt16(operands, 0);
+                        if (absolute >> 8 << 8 != (ushort)(absolute + X) >> 8 << 8)
+                            _currentInstruction.CyclesLeft++;
+                        value = --Memory[(ushort)(absolute + X)];
+                    }
+                    break;
+            }
+
+            C = A >= value;
+            Z = A == value;
+            N = ((byte)(A - value)).GetBit(7);
+        }
+
+        private void SAX(InstructionMetadata metadata, byte[] operands)
+        {
+            switch (metadata.AddressingMode)
+            {
+                case AddressingMode.IndexedIndirect:
+                    Memory[BitConverter.ToUInt16(new[] { Memory[(byte)(operands[0] + X)], Memory[(byte)(operands[0] + X + 1)] }, 0)] = (byte)(A & X);
+                    break;
+                case AddressingMode.ZeroPage:
+                    Memory[operands[0]] = (byte)(A & X);
+                    break;
+                case AddressingMode.Absolute:
+                    Memory[BitConverter.ToUInt16(operands, 0)] = (byte)(A & X);
+                    break;
+                case AddressingMode.IndirectIndexed:
+                    var baseIndirect = BitConverter.ToUInt16(new[] { Memory[operands[0]], Memory[(byte)(operands[0] + 1)] }, 0);
+                    var address = baseIndirect + Y;
+                    if (baseIndirect >> 8 << 8 != address >> 8 << 8)
+                        _currentInstruction.CyclesLeft++;
+                    Memory[(ushort)address] = (byte)(A & X);
+                    break;
+                case AddressingMode.ZeroPageY:
+                    Memory[(byte)(operands[0] + Y)] = (byte)(A & X);
+                    break;
+                case AddressingMode.AbsoluteY:
+                    {
+                        var absolute = BitConverter.ToUInt16(operands, 0);
+                        if (absolute >> 8 << 8 != (ushort)(absolute + Y) >> 8 << 8)
+                            _currentInstruction.CyclesLeft++;
+                        Memory[(ushort)(absolute + Y)] = (byte)(A & X);
+                    }
+                    break;
+            }
+        }
+
+        private void LAX(InstructionMetadata metadata, byte[] operands)
+        {
+            switch (metadata.AddressingMode)
+            {
+                case AddressingMode.IndexedIndirect:
+                    A = X = Memory[BitConverter.ToUInt16(new[] { Memory[(byte)(operands[0] + X)], Memory[(byte)(operands[0] + X + 1)] }, 0)];
+                    break;
+                case AddressingMode.ZeroPage:
+                    A = X = Memory[operands[0]];
+                    break;
+                case AddressingMode.Absolute:
+                    A = X = Memory[BitConverter.ToUInt16(operands, 0)];
+                    break;
+                case AddressingMode.IndirectIndexed:
+                    var baseIndirect = BitConverter.ToUInt16(new[] { Memory[operands[0]], Memory[(byte)(operands[0] + 1)] }, 0);
+                    var address = baseIndirect + Y;
+                    if (baseIndirect >> 8 << 8 != address >> 8 << 8)
+                        _currentInstruction.CyclesLeft++;
+                    A = X = Memory[(ushort)address];
+                    break;
+                case AddressingMode.ZeroPageY:
+                    A = X = Memory[(byte)(operands[0] + Y)];
+                    break;
+                case AddressingMode.AbsoluteY:
+                    {
+                        var absolute = BitConverter.ToUInt16(operands, 0);
+                        if (absolute >> 8 << 8 != (ushort)(absolute + Y) >> 8 << 8)
+                            _currentInstruction.CyclesLeft++;
+                        A = X = Memory[(ushort)(absolute + Y)];
+                    }
+                    break;
+            }
+
+            Z = A == 0;
+            N = A.GetBit(7);
+        }
+
+        private void NOP(InstructionMetadata metadata, byte[] operands)
+        {
+            switch (metadata.AddressingMode)
+            {
+                case AddressingMode.AbsoluteX:
+                    var absolute = BitConverter.ToUInt16(operands, 0);
+                    if (absolute >> 8 << 8 != (ushort)(absolute + X) >> 8 << 8)
+                        _currentInstruction.CyclesLeft++;
+                    break;
+            }
+        }
+
+        private void ROL(InstructionMetadata metadata, byte[] operands)
+        {
+            var oldCarry = C;
+
+            switch (metadata.AddressingMode)
+            {
+                case AddressingMode.Implicit:
+                    C = A.GetBit(7);
+
+                    A <<= 1;
+                    A = A.SetBit(0, oldCarry);
+
+                    Z = A == 0;
+                    N = A.GetBit(7);
+                    break;
+                case AddressingMode.ZeroPage:
+                    C = Memory[operands[0]].GetBit(7);
+
+                    Memory[operands[0]] <<= 1;
+                    Memory[operands[0]] = Memory[operands[0]].SetBit(0, oldCarry);
+
+                    Z = Memory[operands[0]] == 0;
+                    N = Memory[operands[0]].GetBit(7);
+                    break;
+                case AddressingMode.Absolute:
+                    {
+                        var address = BitConverter.ToUInt16(operands, 0);
+
+                        C = Memory[address].GetBit(7);
+
+                        Memory[address] <<= 1;
+                        Memory[address] = Memory[address].SetBit(0, oldCarry);
+
+                        Z = Memory[address] == 0;
+                        N = Memory[address].GetBit(7);
+                        break;
+                    }
+                case AddressingMode.ZeroPageX:
+                    C = Memory[(byte)(operands[0] + X)].GetBit(7);
+
+                    Memory[(byte)(operands[0] + X)] <<= 1;
+                    Memory[(byte)(operands[0] + X)] = Memory[(byte)(operands[0] + X)].SetBit(0, oldCarry);
+
+                    Z = Memory[(byte)(operands[0] + X)] == 0;
+                    N = Memory[(byte)(operands[0] + X)].GetBit(7);
+                    break;
+                case AddressingMode.AbsoluteX:
+                    {
+                        var address = BitConverter.ToUInt16(operands, 0) + X;
+
+                        C = Memory[address].GetBit(7);
+
+                        Memory[address] <<= 1;
+                        Memory[address] = Memory[address].SetBit(0, oldCarry);
+
+                        Z = Memory[address] == 0;
+                        N = Memory[address].GetBit(7);
+                        break;
+                    }
+            }
+        }
+
+        private void ROR(InstructionMetadata metadata, byte[] operands)
+        {
+            var oldCarry = C;
+
+            switch (metadata.AddressingMode)
+            {
+                case AddressingMode.Implicit:
+                    C = A.GetBit(0);
+
+                    A >>= 1;
+                    A = A.SetBit(7, oldCarry);
+
+                    Z = A == 0;
+                    N = A.GetBit(7);
+                    break;
+                case AddressingMode.ZeroPage:
+                    C = Memory[operands[0]].GetBit(0);
+
+                    Memory[operands[0]] >>= 1;
+                    Memory[operands[0]] = Memory[operands[0]].SetBit(7, oldCarry);
+
+                    Z = Memory[operands[0]] == 0;
+                    N = Memory[operands[0]].GetBit(7);
+                    break;
+                case AddressingMode.Absolute:
+                    {
+                        var address = BitConverter.ToUInt16(operands, 0);
+
+                        C = Memory[address].GetBit(0);
+
+                        Memory[address] >>= 1;
+                        Memory[address] = Memory[address].SetBit(7, oldCarry);
+
+                        Z = Memory[address] == 0;
+                        N = Memory[address].GetBit(7);
+                        break;
+                    }
+                case AddressingMode.ZeroPageX:
+                    C = Memory[(byte)(operands[0] + X)].GetBit(0);
+
+                    Memory[(byte)(operands[0] + X)] >>= 1;
+                    Memory[(byte)(operands[0] + X)] = Memory[(byte)(operands[0] + X)].SetBit(7, oldCarry);
+
+                    Z = Memory[(byte)(operands[0] + X)] == 0;
+                    N = Memory[(byte)(operands[0] + X)].GetBit(7);
+                    break;
+                case AddressingMode.AbsoluteX:
+                    {
+                        var address = BitConverter.ToUInt16(operands, 0) + X;
+
+                        C = Memory[address].GetBit(0);
+
+                        Memory[address] >>= 1;
+                        Memory[address] = Memory[address].SetBit(7, oldCarry);
+
+                        Z = Memory[address] == 0;
+                        N = Memory[address].GetBit(7);
+                        break;
+                    }
+            }
+        }
+
+        private void ASL(InstructionMetadata metadata, byte[] operands)
+        {
+            switch (metadata.AddressingMode)
+            {
+                case AddressingMode.Implicit:
+                    C = A.GetBit(7);
+
+                    A <<= 1;
+
+                    Z = A == 0;
+                    N = A.GetBit(7);
+                    break;
+                case AddressingMode.ZeroPage:
+                    C = Memory[operands[0]].GetBit(7);
+
+                    Memory[operands[0]] <<= 1;
+
+                    Z = Memory[operands[0]] == 0;
+                    N = Memory[operands[0]].GetBit(7);
+                    break;
+                case AddressingMode.Absolute:
+                    {
+                        var address = BitConverter.ToUInt16(operands, 0);
+
+                        C = Memory[address].GetBit(7);
+
+                        Memory[address] <<= 1;
+
+                        Z = Memory[address] == 0;
+                        N = Memory[address].GetBit(7);
+                        break;
+                    }
+                case AddressingMode.ZeroPageX:
+                    C = Memory[(byte)(operands[0] + X)].GetBit(7);
+
+                    Memory[(byte)(operands[0] + X)] <<= 1;
+
+                    Z = Memory[(byte)(operands[0] + X)] == 0;
+                    N = Memory[(byte)(operands[0] + X)].GetBit(7);
+                    break;
+                case AddressingMode.AbsoluteX:
+                    {
+                        var address = BitConverter.ToUInt16(operands, 0) + X;
+
+                        C = Memory[address].GetBit(7);
+
+                        Memory[address] <<= 1;
+
+                        Z = Memory[address] == 0;
+                        N = Memory[address].GetBit(7);
+                        break;
+                    }
+            }
+        }
+
+        private void LSR(InstructionMetadata metadata, byte[] operands)
+        {
+            switch (metadata.AddressingMode)
+            {
+                case AddressingMode.Implicit:
+                    C = A.GetBit(0);
+
+                    A >>= 1;
+
+                    Z = A == 0;
+                    N = A.GetBit(7);
+                    break;
+                case AddressingMode.ZeroPage:
+                    C = Memory[operands[0]].GetBit(0);
+
+                    Memory[operands[0]] >>= 1;
+
+                    Z = Memory[operands[0]] == 0;
+                    N = Memory[operands[0]].GetBit(7);
+                    break;
+                case AddressingMode.Absolute:
+                    {
+                        var address = BitConverter.ToUInt16(operands, 0);
+
+                        C = Memory[address].GetBit(0);
+
+                        Memory[address] >>= 1;
+
+                        Z = Memory[address] == 0;
+                        N = Memory[address].GetBit(7);
+
+                        break;
+                    }
+                case AddressingMode.ZeroPageX:
+                    C = Memory[(byte)(operands[0] + X)].GetBit(0);
+
+                    Memory[(byte)(operands[0] + X)] >>= 1;
+
+                    Z = Memory[(byte)(operands[0] + X)] == 0;
+                    N = Memory[(byte)(operands[0] + X)].GetBit(7);
+                    break;
+                case AddressingMode.AbsoluteX:
+                    {
+                        var address = BitConverter.ToUInt16(operands, 0) + X;
+
+                        C = Memory[address].GetBit(0);
+
+                        Memory[address] >>= 1;
+
+                        Z = Memory[address] == 0;
+                        N = Memory[address].GetBit(7);
+
+                        break;
+                    }
+            }
+
+        }
+
+        private void RTI(InstructionMetadata metadata, byte[] operands)
+        {
+            P = (byte)(PopByte() & 0xEF | 0x20);
+            PC = PopUInt16();
+        }
+
+        private void TYA(InstructionMetadata metadata, byte[] operands)
+        {
+            A = Y;
+
+            Z = A == 0;
+            N = A.GetBit(7);
+        }
+
+        private void TXA(InstructionMetadata metadata, byte[] operands)
+        {
+            A = X;
+
+            Z = A == 0;
+            N = A.GetBit(7);
+        }
+
+        private void TSX(InstructionMetadata metadata, byte[] operands)
+        {
+            X = S;
+
+            Z = X == 0;
+            N = X.GetBit(7);
+        }
+
+        private void TAY(InstructionMetadata metadata, byte[] operands)
+        {
+            Y = A;
+
+            Z = Y == 0;
+            N = Y.GetBit(7);
+        }
+
+        private void TAX(InstructionMetadata metadata, byte[] operands)
+        {
+            X = A;
+
+            Z = X == 0;
+            N = X.GetBit(7);
+        }
+
+        private void DEY(InstructionMetadata metadata, byte[] operands)
+        {
+            Y--;
+
+            Z = Y == 0;
+            N = Y.GetBit(7);
+        }
+
+        private void DEX(InstructionMetadata metadata, byte[] operands)
+        {
+            X--;
+
+            Z = X == 0;
+            N = X.GetBit(7);
+        }
+
+        private void DEC(InstructionMetadata metadata, byte[] operands)
+        {
+            switch (metadata.AddressingMode)
+            {
+                case AddressingMode.ZeroPage:
+                    Memory[operands[0]]--;
+
+                    Z = Memory[operands[0]] == 0;
+                    N = Memory[operands[0]].GetBit(7);
+                    break;
+                case AddressingMode.Absolute:
+                    {
+                        var address = BitConverter.ToUInt16(operands, 0);
+
+                        Memory[address]--;
+
+                        Z = Memory[address] == 0;
+                        N = Memory[address].GetBit(7);
+                        break;
+                    }
+                case AddressingMode.ZeroPageX:
+                    Memory[(byte)(operands[0] + X)]--;
+
+                    Z = Memory[(byte)(operands[0] + X)] == 0;
+                    N = Memory[(byte)(operands[0] + X)].GetBit(7);
+                    break;
+                case AddressingMode.AbsoluteX:
+                    {
+                        var address = BitConverter.ToUInt16(operands, 0) + X;
+
+                        Memory[address]--;
+
+                        Z = Memory[address] == 0;
+                        N = Memory[address].GetBit(7);
+                        break;
+                    }
+            }
+        }
+
+        private void INY(InstructionMetadata metadata, byte[] operands)
+        {
+            Y++;
+
+            Z = Y == 0;
+            N = Y.GetBit(7);
+        }
+
+        private void INX(InstructionMetadata metadata, byte[] operands)
+        {
+            X++;
+
+            Z = X == 0;
+            N = X.GetBit(7);
+        }
+
+        private void INC(InstructionMetadata metadata, byte[] operands)
+        {
+            switch (metadata.AddressingMode)
+            {
+                case AddressingMode.ZeroPage:
+                    Memory[operands[0]]++;
+
+                    Z = Memory[operands[0]] == 0;
+                    N = Memory[operands[0]].GetBit(7);
+                    break;
+                case AddressingMode.Absolute:
+                    {
+                        var address = BitConverter.ToUInt16(operands, 0);
+
+                        Memory[address]++;
+
+                        Z = Memory[address] == 0;
+                        N = Memory[address].GetBit(7);
+                        break;
+                    }
+                case AddressingMode.ZeroPageX:
+                    Memory[(byte)(operands[0] + X)]++;
+
+                    Z = Memory[(byte)(operands[0] + X)] == 0;
+                    N = Memory[(byte)(operands[0] + X)].GetBit(7);
+                    break;
+                case AddressingMode.AbsoluteX:
+                    {
+                        var address = BitConverter.ToUInt16(operands, 0) + X;
+
+                        Memory[address]++;
+
+                        Z = Memory[address] == 0;
+                        N = Memory[address].GetBit(7);
+                        break;
+                    }
+            }
+        }
+
+        private void ADC(InstructionMetadata metadata, byte[] operands)
+        {
+            var value = 0;
+
+            switch (metadata.AddressingMode)
+            {
+                case AddressingMode.Immediate:
+                    value = operands[0];
+                    break;
+                case AddressingMode.IndexedIndirect:
+                    value = Memory[BitConverter.ToUInt16(new[] { Memory[(byte)(operands[0] + X)], Memory[(byte)(operands[0] + X + 1)] }, 0)];
+                    break;
+                case AddressingMode.ZeroPage:
+                    value = Memory[operands[0]];
+                    break;
+                case AddressingMode.Absolute:
+                    value = Memory[BitConverter.ToUInt16(operands, 0)];
+                    break;
+                case AddressingMode.IndirectIndexed:
+                    var baseIndirect = BitConverter.ToUInt16(new[] { Memory[operands[0]], Memory[(byte)(operands[0] + 1)] }, 0);
+                    var address = baseIndirect + Y;
+                    if (baseIndirect >> 8 << 8 != address >> 8 << 8)
+                        _currentInstruction.CyclesLeft++;
+                    value = Memory[(ushort)address];
+                    break;
+                case AddressingMode.AbsoluteY:
+                    {
+                        var absolute = BitConverter.ToUInt16(operands, 0);
+                        if (absolute >> 8 << 8 != (ushort)(absolute + Y) >> 8 << 8)
+                            _currentInstruction.CyclesLeft++;
+                        value = Memory[(ushort)(absolute + Y)];
+                        break;
+                    }
+                case AddressingMode.ZeroPageX:
+                    value = Memory[(byte)(operands[0] + X)];
+                    break;
+                case AddressingMode.AbsoluteX:
+                    {
+                        var absolute = BitConverter.ToUInt16(operands, 0);
+                        if (absolute >> 8 << 8 != (ushort)(absolute + X) >> 8 << 8)
+                            _currentInstruction.CyclesLeft++;
+                        value = Memory[(ushort)(absolute + X)];
+                        break;
+                    }
+            }
+
+            var unsignedResult = A + (uint)value + (uint)(C ? 1 : 0);
+
+            C = unsignedResult > byte.MaxValue;
+            V = ((value ^ unsignedResult) & (A ^ unsignedResult) & 0x80) != 0;
+
+            A = (byte)unsignedResult;
+
+            Z = A == 0;
+            N = A.GetBit(7);
+        }
+
+        private void SBC(InstructionMetadata metadata, byte[] operands)
+        {
+            var value = 0;
+
+            switch (metadata.AddressingMode)
+            {
+                case AddressingMode.Immediate:
+                    value = operands[0];
+                    break;
+                case AddressingMode.IndexedIndirect:
+                    value = Memory[BitConverter.ToUInt16(new[] { Memory[(byte)(operands[0] + X)], Memory[(byte)(operands[0] + X + 1)] }, 0)];
+                    break;
+                case AddressingMode.ZeroPage:
+                    value = Memory[operands[0]];
+                    break;
+                case AddressingMode.Absolute:
+                    value = Memory[BitConverter.ToUInt16(operands, 0)];
+                    break;
+                case AddressingMode.IndirectIndexed:
+                    var baseIndirect = BitConverter.ToUInt16(new[] { Memory[operands[0]], Memory[(byte)(operands[0] + 1)] }, 0);
+                    var address = baseIndirect + Y;
+                    if (baseIndirect >> 8 << 8 != address >> 8 << 8)
+                        _currentInstruction.CyclesLeft++;
+                    value = Memory[(ushort)address];
+                    break;
+                case AddressingMode.AbsoluteY:
+                    {
+                        var absolute = BitConverter.ToUInt16(operands, 0);
+                        if (absolute >> 8 << 8 != (ushort)(absolute + Y) >> 8 << 8)
+                            _currentInstruction.CyclesLeft++;
+                        value = Memory[(ushort)(absolute + Y)];
+                        break;
+                    }
+                case AddressingMode.ZeroPageX:
+                    value = Memory[(byte)(operands[0] + X)];
+                    break;
+                case AddressingMode.AbsoluteX:
+                    {
+                        var absolute = BitConverter.ToUInt16(operands, 0);
+                        if (absolute >> 8 << 8 != (ushort)(absolute + X) >> 8 << 8)
+                            _currentInstruction.CyclesLeft++;
+                        value = Memory[(ushort)(absolute + X)];
+                        break;
+                    }
+            }
+
+            var unsignedResult = A + (byte)~value + (uint)(C ? 1 : 0);
+
+            C = unsignedResult > byte.MaxValue;
+            V = (((byte)~value ^ unsignedResult) & (A ^ unsignedResult) & 0x80) != 0;
+
+            A = (byte)unsignedResult;
+
+            Z = A == 0;
+            N = A.GetBit(7);
+        }
+
+        private void CPY(InstructionMetadata metadata, byte[] operands)
+        {
+            var value = 0;
+
+            switch (metadata.AddressingMode)
+            {
+                case AddressingMode.Immediate:
+                    value = operands[0];
+                    break;
+                case AddressingMode.ZeroPage:
+                    value = Memory[operands[0]];
+                    break;
+                case AddressingMode.Absolute:
+                    value = Memory[BitConverter.ToUInt16(operands, 0)];
+                    break;
+            }
+
+            C = Y >= value;
+            Z = Y == value;
+            N = ((byte)(Y - value)).GetBit(7);
+        }
+
+        private void CPX(InstructionMetadata metadata, byte[] operands)
+        {
+            var value = 0;
+
+            switch (metadata.AddressingMode)
+            {
+                case AddressingMode.Immediate:
+                    value = operands[0];
+                    break;
+                case AddressingMode.ZeroPage:
+                    value = Memory[operands[0]];
+                    break;
+                case AddressingMode.Absolute:
+                    value = Memory[BitConverter.ToUInt16(operands, 0)];
+                    break;
+            }
+
+            C = X >= value;
+            Z = X == value;
+            N = ((byte)(X - value)).GetBit(7);
+        }
+
+        private void CMP(InstructionMetadata metadata, byte[] operands)
+        {
+            var value = 0;
+
+            switch (metadata.AddressingMode)
+            {
+                case AddressingMode.Immediate:
+                    value = operands[0];
+                    break;
+                case AddressingMode.IndexedIndirect:
+                    value = Memory[BitConverter.ToUInt16(new[] { Memory[(byte)(operands[0] + X)], Memory[(byte)(operands[0] + X + 1)] }, 0)];
+                    break;
+                case AddressingMode.ZeroPage:
+                    value = Memory[operands[0]];
+                    break;
+                case AddressingMode.Absolute:
+                    value = Memory[BitConverter.ToUInt16(operands, 0)];
+                    break;
+                case AddressingMode.IndirectIndexed:
+                    var baseIndirect = BitConverter.ToUInt16(new[] { Memory[operands[0]], Memory[(byte)(operands[0] + 1)] }, 0);
+                    var address = baseIndirect + Y;
+                    if (baseIndirect >> 8 << 8 != address >> 8 << 8)
+                        _currentInstruction.CyclesLeft++;
+                    value = Memory[(ushort)address];
+                    break;
+                case AddressingMode.AbsoluteY:
+                    {
+                        var absolute = BitConverter.ToUInt16(operands, 0);
+                        if (absolute >> 8 << 8 != (ushort)(absolute + Y) >> 8 << 8)
+                            _currentInstruction.CyclesLeft++;
+                        value = Memory[(ushort)(absolute + Y)];
+                        break;
+                    }
+                case AddressingMode.ZeroPageX:
+                    value = Memory[(byte)(operands[0] + X)];
+                    break;
+                case AddressingMode.AbsoluteX:
+                    {
+                        var absolute = BitConverter.ToUInt16(operands, 0);
+                        if (absolute >> 8 << 8 != (ushort)(absolute + X) >> 8 << 8)
+                            _currentInstruction.CyclesLeft++;
+                        value = Memory[(ushort)(absolute + X)];
+                        break;
+                    }
+            }
+
+            C = A >= value;
+            Z = A == value;
+            N = ((byte)(A - value)).GetBit(7);
+        }
+
+        private void EOR(InstructionMetadata metadata, byte[] operands)
+        {
+            switch (metadata.AddressingMode)
+            {
+                case AddressingMode.Immediate:
+                    A = (byte)(A ^ operands[0]);
+                    break;
+                case AddressingMode.IndexedIndirect:
+                    A = (byte)(A ^ Memory[BitConverter.ToUInt16(new[] { Memory[(byte)(operands[0] + X)], Memory[(byte)(operands[0] + X + 1)] }, 0)]);
+                    break;
+                case AddressingMode.ZeroPage:
+                    A = (byte)(A ^ Memory[operands[0]]);
+                    break;
+                case AddressingMode.Absolute:
+                    A = (byte)(A ^ Memory[BitConverter.ToUInt16(operands, 0)]);
+                    break;
+                case AddressingMode.IndirectIndexed:
+                    var baseIndirect = BitConverter.ToUInt16(new[] { Memory[operands[0]], Memory[(byte)(operands[0] + 1)] }, 0);
+                    var address = baseIndirect + Y;
+                    if (baseIndirect >> 8 << 8 != address >> 8 << 8)
+                        _currentInstruction.CyclesLeft++;
+                    A = (byte)(A ^ Memory[(ushort)address]);
+                    break;
+                case AddressingMode.AbsoluteY:
+                    {
+                        var absolute = BitConverter.ToUInt16(operands, 0);
+                        if (absolute >> 8 << 8 != (ushort)(absolute + Y) >> 8 << 8)
+                            _currentInstruction.CyclesLeft++;
+                        A = (byte)(A ^ Memory[(ushort)(absolute + Y)]);
+                        break;
+                    }
+                case AddressingMode.ZeroPageX:
+                    A = (byte)(A ^ Memory[(byte)(operands[0] + X)]);
+                    break;
+                case AddressingMode.AbsoluteX:
+                    {
+                        var absolute = BitConverter.ToUInt16(operands, 0);
+                        if (absolute >> 8 << 8 != (ushort)(absolute + X) >> 8 << 8)
+                            _currentInstruction.CyclesLeft++;
+                        A = (byte)(A ^ Memory[(ushort)(absolute + X)]);
+                        break;
+                    }
+            }
+
+            Z = A == 0;
+            N = A.GetBit(7);
+        }
+
+        private void ORA(InstructionMetadata metadata, byte[] operands)
+        {
+            switch (metadata.AddressingMode)
+            {
+                case AddressingMode.Immediate:
+                    A = (byte)(A | operands[0]);
+                    break;
+                case AddressingMode.IndexedIndirect:
+                    A = (byte)(A | Memory[BitConverter.ToUInt16(new[] { Memory[(byte)(operands[0] + X)], Memory[(byte)(operands[0] + X + 1)] }, 0)]);
+                    break;
+                case AddressingMode.ZeroPage:
+                    A = (byte)(A | Memory[operands[0]]);
+                    break;
+                case AddressingMode.Absolute:
+                    A = (byte)(A | Memory[BitConverter.ToUInt16(operands, 0)]);
+                    break;
+                case AddressingMode.IndirectIndexed:
+                    var baseIndirect = BitConverter.ToUInt16(new[] { Memory[operands[0]], Memory[(byte)(operands[0] + 1)] }, 0);
+                    var address = baseIndirect + Y;
+                    if (baseIndirect >> 8 << 8 != address >> 8 << 8)
+                        _currentInstruction.CyclesLeft++;
+                    A = (byte)(A | Memory[(ushort)address]);
+                    break;
+                case AddressingMode.AbsoluteY:
+                    {
+                        var absolute = BitConverter.ToUInt16(operands, 0);
+                        if (absolute >> 8 << 8 != (ushort)(absolute + Y) >> 8 << 8)
+                            _currentInstruction.CyclesLeft++;
+                        A = (byte)(A | Memory[(ushort)(absolute + Y)]);
+                        break;
+                    }
+                case AddressingMode.ZeroPageX:
+                    A = (byte)(A | Memory[(byte)(operands[0] + X)]);
+                    break;
+                case AddressingMode.AbsoluteX:
+                    {
+                        var absolute = BitConverter.ToUInt16(operands, 0);
+                        if (absolute >> 8 << 8 != (ushort)(absolute + X) >> 8 << 8)
+                            _currentInstruction.CyclesLeft++;
+                        A = (byte)(A | Memory[(ushort)(absolute + X)]);
+                        break;
+                    }
+            }
+
+            Z = A == 0;
+            N = A.GetBit(7);
+        }
+
+        private void AND(InstructionMetadata metadata, byte[] operands)
+        {
+            switch (metadata.AddressingMode)
+            {
+                case AddressingMode.Immediate:
+                    A = (byte)(A & operands[0]);
+                    break;
+                case AddressingMode.IndexedIndirect:
+                    A = (byte)(A & Memory[BitConverter.ToUInt16(new[] { Memory[(byte)(operands[0] + X)], Memory[(byte)(operands[0] + X + 1)] }, 0)]);
+                    break;
+                case AddressingMode.ZeroPage:
+                    A = (byte)(A & Memory[operands[0]]);
+                    break;
+                case AddressingMode.Absolute:
+                    A = (byte)(A & Memory[BitConverter.ToUInt16(operands, 0)]);
+                    break;
+                case AddressingMode.IndirectIndexed:
+                    var baseIndirect = BitConverter.ToUInt16(new[] { Memory[operands[0]], Memory[(byte)(operands[0] + 1)] }, 0);
+                    var address = baseIndirect + Y;
+                    if (baseIndirect >> 8 << 8 != address >> 8 << 8)
+                        _currentInstruction.CyclesLeft++;
+                    A = (byte)(A & Memory[(ushort)address]);
+                    break;
+                case AddressingMode.AbsoluteY:
+                    {
+                        var absolute = BitConverter.ToUInt16(operands, 0);
+                        if (absolute >> 8 << 8 != (ushort)(absolute + Y) >> 8 << 8)
+                            _currentInstruction.CyclesLeft++;
+                        A = (byte)(A & Memory[(ushort)(absolute + Y)]);
+                        break;
+                    }
+                case AddressingMode.ZeroPageX:
+                    A = (byte)(A & Memory[(byte)(operands[0] + X)]);
+                    break;
+                case AddressingMode.AbsoluteX:
+                    {
+                        var absolute = BitConverter.ToUInt16(operands, 0);
+                        if (absolute >> 8 << 8 != (ushort)(absolute + X) >> 8 << 8)
+                            _currentInstruction.CyclesLeft++;
+                        A = (byte)(A & Memory[(ushort)(absolute + X)]);
+                        break;
+                    }
+            }
+
+            Z = A == 0;
+            N = A.GetBit(7);
+        }
+
+        private void PLA(InstructionMetadata metadata, byte[] operands)
+        {
+            A = PopByte();
+
+            Z = A == 0;
+            N = A.GetBit(7);
+        }
+
+        private void RTS(InstructionMetadata metadata, byte[] operands)
+        {
+            PC = (ushort)(PopUInt16() + 1);
+        }
+
+        private void BIT(InstructionMetadata metadata, byte[] operands)
+        {
+            byte value = 0;
+
+            switch (metadata.AddressingMode)
+            {
+                case AddressingMode.ZeroPage:
+                    value = Memory[operands[0]];
+                    break;
+                case AddressingMode.Absolute:
+                    value = Memory[BitConverter.ToUInt16(operands, 0)];
+                    break;
+            }
+
+            Z = (A & value) == 0;
+            V = value.GetBit(6);
+            N = value.GetBit(7);
+        }
+
+        private void B(IList<byte> operands, bool flag, bool state)
+        {
+            if (flag == state)
+            {
+                var target = (ushort)(PC + (sbyte)operands[0]);
+
+                if (PC >> 8 << 8 != target >> 8 << 8)
+                    _currentInstruction.CyclesLeft++;
+
+                PC = target;
+
+                _currentInstruction.CyclesLeft++;
+            }
+        }
+
+        private void JMP(InstructionMetadata metadata, byte[] operands)
+        {
+            switch (metadata.AddressingMode)
+            {
+                case AddressingMode.Absolute:
+                    PC = BitConverter.ToUInt16(operands, 0);
+                    break;
+                case AddressingMode.Indirect:
+                    var indirect = BitConverter.ToUInt16(operands, 0);
+                    PC = BitConverter.ToUInt16(new[] { Memory[indirect], (indirect & 0xFF) == 0xFF ? Memory[indirect - 0xFF] : Memory[indirect + 1] }, 0);
+                    break;
+            }
+        }
+
+        private void JSR(InstructionMetadata metadata, byte[] operands)
+        {
+            Push((ushort)(PC - 1));
+
+            PC = BitConverter.ToUInt16(operands, 0);
+        }
+
+        private void STA(InstructionMetadata metadata, byte[] operands)
+        {
+            switch (metadata.AddressingMode)
+            {
+                case AddressingMode.ZeroPage:
+                    Memory[operands[0]] = A;
+                    break;
+                case AddressingMode.Absolute:
+                    Memory[BitConverter.ToUInt16(operands, 0)] = A;
+                    break;
+                case AddressingMode.IndexedIndirect:
+                    Memory[BitConverter.ToUInt16(new[] { Memory[(byte)(operands[0] + X)], Memory[(byte)(operands[0] + X + 1)] }, 0)] = A;
+                    break;
+                case AddressingMode.IndirectIndexed:
+                    var baseIndirect = BitConverter.ToUInt16(new[] { Memory[operands[0]], Memory[(byte)(operands[0] + 1)] }, 0);
+                    var address = baseIndirect + Y;
+                    Memory[(ushort)address] = A;
+                    break;
+                case AddressingMode.AbsoluteY:
+                    {
+                        var absolute = BitConverter.ToUInt16(operands, 0);
+                        Memory[(ushort)(absolute + Y)] = A;
+                        break;
+                    }
+                case AddressingMode.ZeroPageX:
+                    Memory[(byte)(operands[0] + X)] = A;
+                    break;
+                case AddressingMode.AbsoluteX:
+                    {
+                        var absolute = BitConverter.ToUInt16(operands, 0);
+                        Memory[(ushort)(absolute + X)] = A;
+                        break;
+                    }
+            }
+        }
+
+        private void STX(InstructionMetadata metadata, byte[] operands)
+        {
+            switch (metadata.AddressingMode)
+            {
+                case AddressingMode.ZeroPage:
+                    Memory[operands[0]] = X;
+                    break;
+                case AddressingMode.Absolute:
+                    Memory[BitConverter.ToUInt16(operands, 0)] = X;
+                    break;
+                case AddressingMode.ZeroPageY:
+                    Memory[(byte)(operands[0] + Y)] = X;
+                    break;
+            }
+        }
+
+        private void STY(InstructionMetadata metadata, byte[] operands)
+        {
+            switch (metadata.AddressingMode)
+            {
+                case AddressingMode.ZeroPage:
+                    Memory[operands[0]] = Y;
+                    break;
+                case AddressingMode.Absolute:
+                    Memory[BitConverter.ToUInt16(operands, 0)] = Y;
+                    break;
+                case AddressingMode.ZeroPageX:
+                    Memory[(byte)(operands[0] + X)] = Y;
+                    break;
+            }
+        }
+
+        private void LDA(InstructionMetadata metadata, byte[] operands)
+        {
+            switch (metadata.AddressingMode)
+            {
+                case AddressingMode.Immediate:
+                    A = operands[0];
+                    break;
+                case AddressingMode.Absolute:
+                    A = Memory[BitConverter.ToUInt16(operands, 0)];
+                    break;
+                case AddressingMode.ZeroPage:
+                    A = Memory[operands[0]];
+                    break;
+                case AddressingMode.IndexedIndirect:
+                    A = Memory[BitConverter.ToUInt16(new[] { Memory[(byte)(operands[0] + X)], Memory[(byte)(operands[0] + X + 1)] }, 0)];
+                    break;
+                case AddressingMode.IndirectIndexed:
+                    var baseIndirect = BitConverter.ToUInt16(new[] { Memory[operands[0]], Memory[(byte)(operands[0] + 1)] }, 0);
+                    var address = baseIndirect + Y;
+                    if (baseIndirect >> 8 << 8 != address >> 8 << 8)
+                        _currentInstruction.CyclesLeft++;
+                    A = Memory[(ushort)address];
+                    break;
+                case AddressingMode.AbsoluteY:
+                    {
+                        var absolute = BitConverter.ToUInt16(operands, 0);
+                        if (absolute >> 8 << 8 != (ushort)(absolute + Y) >> 8 << 8)
+                            _currentInstruction.CyclesLeft++;
+                        A = Memory[(ushort)(absolute + Y)];
+                    }
+                    break;
+                case AddressingMode.ZeroPageX:
+                    A = Memory[(byte)(operands[0] + X)];
+                    break;
+                case AddressingMode.AbsoluteX:
+                    {
+                        var absolute = BitConverter.ToUInt16(operands, 0);
+                        if (absolute >> 8 << 8 != (ushort)(absolute + X) >> 8 << 8)
+                            _currentInstruction.CyclesLeft++;
+                        A = Memory[(ushort)(absolute + X)];
+                    }
+                    break;
+            }
+
+            Z = A == 0;
+            N = A.GetBit(7);
+        }
+
+        private void LDX(InstructionMetadata metadata, byte[] operands)
+        {
+            switch (metadata.AddressingMode)
+            {
+                case AddressingMode.Immediate:
+                    X = operands[0];
+                    break;
+                case AddressingMode.Absolute:
+                    X = Memory[BitConverter.ToUInt16(operands, 0)];
+                    break;
+                case AddressingMode.ZeroPage:
+                    X = Memory[operands[0]];
+                    break;
+                case AddressingMode.ZeroPageY:
+                    X = Memory[(byte)(operands[0] + Y)];
+                    break;
+                case AddressingMode.AbsoluteY:
+                    var absolute = BitConverter.ToUInt16(operands, 0);
+                    if (absolute >> 8 << 8 != (ushort)(absolute + Y) >> 8 << 8)
+                        _currentInstruction.CyclesLeft++;
+                    X = Memory[(ushort)(absolute + Y)];
+                    break;
+            }
+
+            Z = X == 0;
+            N = X.GetBit(7);
+        }
+
+        private void LDY(InstructionMetadata metadata, byte[] operands)
+        {
+            switch (metadata.AddressingMode)
+            {
+                case AddressingMode.Immediate:
+                    Y = operands[0];
+                    break;
+                case AddressingMode.Absolute:
+                    Y = Memory[BitConverter.ToUInt16(operands, 0)];
+                    break;
+                case AddressingMode.ZeroPage:
+                    Y = Memory[operands[0]];
+                    break;
+                case AddressingMode.ZeroPageX:
+                    Y = Memory[(byte)(operands[0] + X)];
+                    break;
+                case AddressingMode.AbsoluteX:
+                    var absolute = BitConverter.ToUInt16(operands, 0);
+                    if (absolute >> 8 << 8 != (ushort)(absolute + X) >> 8 << 8)
+                        _currentInstruction.CyclesLeft++;
+                    Y = Memory[(ushort)(absolute + X)];
+                    break;
+            }
+
+            Z = Y == 0;
+            N = Y.GetBit(7);
+        }
+    }
+
+    public struct InstructionMetadata
+    {
+        public bool Equals(InstructionMetadata other)
+        {
+            return Equals(Action, other.Action) && AddressingMode == other.AddressingMode && CycleCount == other.CycleCount && string.Equals(Name, other.Name) && OperandSize == other.OperandSize;
+        }
+
+        public override bool Equals(object obj)
+        {
+            if (ReferenceEquals(null, obj))
+                return false;
+            return obj is InstructionMetadata && Equals((InstructionMetadata) obj);
+        }
+
+        public override int GetHashCode()
+        {
+            unchecked
+            {
+                var hashCode = (Action != null ? Action.GetHashCode() : 0);
+                hashCode = (hashCode * 397) ^ (int) AddressingMode;
+                hashCode = (hashCode * 397) ^ CycleCount;
+                hashCode = (hashCode * 397) ^ (Name != null ? Name.GetHashCode() : 0);
+                hashCode = (hashCode * 397) ^ OperandSize.GetHashCode();
+                return hashCode;
+            }
+        }
+
+        public readonly Action<InstructionMetadata, byte[]> Action;
+        public readonly AddressingMode AddressingMode;
+        public readonly int CycleCount;
+        public readonly string Name;
+        public readonly ushort OperandSize;
+
+        public InstructionMetadata(string name, AddressingMode addressingMode, ushort operandSize, int cycleCount, Action<InstructionMetadata, byte[]> action)
+        {
+            Name = name;
+            AddressingMode = addressingMode;
+            OperandSize = operandSize;
+            CycleCount = cycleCount;
+            Action = action;
+        }
+
+        public static bool operator ==(InstructionMetadata a, InstructionMetadata b)
+        {
+            return a.Equals(b);
+        }
+
+        public static bool operator !=(InstructionMetadata a, InstructionMetadata b)
+        {
+            return !(a == b);
+        }
+    }
 }
